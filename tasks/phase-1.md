@@ -31,12 +31,12 @@ Rule: do NOT write views/urls/templates/forms in this phase.
   - Commit: `feat(accounts): add custom User model`
   - Done notes: Implemented custom User model extending AbstractUser with unique email, phone, city, neighborhood, bio, and is_email_verified; configured custom UserAdmin with fieldsets, list_display, search_fields and filters; generated and applied 0001_initial migration on PostgreSQL; verified via check, migrate, and shell createsuperuser tests.
 
-- [ ] **P1-05 catalog models**
+- [x] **P1-05 catalog models**
   - Files: `backend/catalog/models.py`, `admin.py`, migration.
   - Goal: Category, Item, ItemImage with constraints/indexes from DOMAIN.md; `__str__` on all; `Meta.ordering`.
   - Acceptance: migrate OK; in `manage.py shell` create a Category + Item; violating `daily_price=0` raises IntegrityError.
   - Commit: `feat(catalog): add Category, Item and ItemImage models`
-  - Done notes:
+  - Done notes: Defined Category (recursive self-parent, unique slug), Item (owner, protected category, condition choices, money fields, delivery options), and ItemImage (order, primary flag); added database CheckConstraints for daily_price > 0 and (allow_pickup or allow_courier); added composite index on (city, is_active); registered CategoryAdmin, ItemAdmin with ItemImageInline, and ItemImageAdmin in admin; created and applied 0001_initial migration; verified constraints in shell.
 
 - [ ] **P1-06 rentals models**
   - Files: `backend/rentals/models.py`, `admin.py`, migration.
