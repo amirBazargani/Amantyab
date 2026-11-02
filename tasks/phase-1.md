@@ -17,12 +17,12 @@ Rule: do NOT write views/urls/templates/forms in this phase.
   - Commit: `chore: create accounts, catalog, rentals, reviews, chat, core apps`
   - Done notes: Created 6 apps (accounts, catalog, rentals, reviews, chat, core); added to INSTALLED_APPS; set AUTH_USER_MODEL = "accounts.User"; defined base User model; dropped and recreated dev PostgreSQL DB for clean slate; verified with manage.py check (0 issues).
 
-- [ ] **P1-03 Process design documents**
+- [x] **P1-03 Process design documents**
   - Goal: finalise diagrams and write the per-app/web process descriptions (Persian).
   - Files: `docs/PROCESSES.md`, `docs/REPORT.md` (sections 1 and 2 only).
   - Acceptance: 4 mermaid diagrams render on GitHub (whole site, rental state machine, search→rent, dispute); REPORT §2 has a paragraph for web + each of the 6 apps. Also export the main diagram as PNG into `docs/img/` if a tool is available (optional).
   - Commit: `docs: add process diagrams and process descriptions`
-  - Done notes:
+  - Done notes: Finalised 4 Mermaid diagrams in docs/PROCESSES.md and docs/REPORT.md §1 (whole site, rental state machine, search-to-rent, dispute resolution); wrote detailed Persian process descriptions for web and each of the 6 apps in docs/REPORT.md §2; verified mermaid syntax and Django system check.
 
 - [ ] **P1-04 accounts models**
   - Files: `backend/accounts/models.py`, `admin.py`, migration.
