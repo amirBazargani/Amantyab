@@ -38,12 +38,12 @@ Rule: do NOT write views/urls/templates/forms in this phase.
   - Commit: `feat(catalog): add Category, Item and ItemImage models`
   - Done notes: Defined Category (recursive self-parent, unique slug), Item (owner, protected category, condition choices, money fields, delivery options), and ItemImage (order, primary flag); added database CheckConstraints for daily_price > 0 and (allow_pickup or allow_courier); added composite index on (city, is_active); registered CategoryAdmin, ItemAdmin with ItemImageInline, and ItemImageAdmin in admin; created and applied 0001_initial migration; verified constraints in shell.
 
-- [ ] **P1-06 rentals models**
+- [x] **P1-06 rentals models**
   - Files: `backend/rentals/models.py`, `admin.py`, migration.
   - Goal: Rental (status choices, constraints, clean()), Payment, Dispute. NO services/pricing yet (Phase 2).
   - Acceptance: migrate OK; shell: creating Rental with end<start fails; clean() rejects renter==owner.
   - Commit: `feat(rentals): add Rental, Payment and Dispute models`
-  - Done notes:
+  - Done notes: Implemented Rental (status and delivery method choices, money fields, tracking code, rental_end_after_start CheckConstraint, clean() validating owner!=renter and overlap prevention against non-cancelled rentals), Payment (receipt_no, kind, status, amount), and Dispute (reason, status, deposit_decision, resolution tracking); configured RentalAdmin with PaymentInline and DisputeInline, PaymentAdmin, and DisputeAdmin; generated and applied 0001_initial migration on PostgreSQL; verified constraints, clean() validations, and payment/dispute creation in shell.
 
 - [ ] **P1-07 reviews and chat models**
   - Files: `backend/reviews/models.py`, `backend/chat/models.py`, both `admin.py`, migrations.
