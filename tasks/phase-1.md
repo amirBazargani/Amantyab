@@ -10,12 +10,12 @@ Rule: do NOT write views/urls/templates/forms in this phase.
   - Commits: `chore: initialize Django project with PostgreSQL settings` · `chore: add docker-compose, env example and gitignore`
   - Done notes: Django 6.1 config project initialized; PostgreSQL 16 running via Docker Compose; psycopg 3 and python-dotenv configured; fa/Asia/Tehran set; static and media configured; .env git-ignored; verified via check and migrate.
 
-- [ ] **P1-02 Create apps + custom user setting**
+- [x] **P1-02 Create apps + custom user setting**
   - Goal: apps exist and are installed; `AUTH_USER_MODEL` set BEFORE any migrate.
   - Files: `backend/accounts|catalog|rentals|reviews|chat|core/` (startapp), `backend/config/settings.py`.
   - Acceptance: `check` OK; all six apps in INSTALLED_APPS; `AUTH_USER_MODEL = "accounts.User"`. (If `migrate` was already run in P1-01, drop and recreate the dev DB.)
   - Commit: `chore: create accounts, catalog, rentals, reviews, chat, core apps`
-  - Done notes:
+  - Done notes: Created 6 apps (accounts, catalog, rentals, reviews, chat, core); added to INSTALLED_APPS; set AUTH_USER_MODEL = "accounts.User"; defined base User model; dropped and recreated dev PostgreSQL DB for clean slate; verified with manage.py check (0 issues).
 
 - [ ] **P1-03 Process design documents**
   - Goal: finalise diagrams and write the per-app/web process descriptions (Persian).
