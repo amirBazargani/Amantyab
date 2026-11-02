@@ -24,12 +24,12 @@ Rule: do NOT write views/urls/templates/forms in this phase.
   - Commit: `docs: add process diagrams and process descriptions`
   - Done notes: Finalised 4 Mermaid diagrams in docs/PROCESSES.md and docs/REPORT.md §1 (whole site, rental state machine, search-to-rent, dispute resolution); wrote detailed Persian process descriptions for web and each of the 6 apps in docs/REPORT.md §2; verified mermaid syntax and Django system check.
 
-- [ ] **P1-04 accounts models**
+- [x] **P1-04 accounts models**
   - Files: `backend/accounts/models.py`, `admin.py`, migration.
   - Goal: `User` exactly as in docs/DOMAIN.md.
   - Acceptance: `makemigrations` creates 0001; `migrate` OK; `createsuperuser` works.
   - Commit: `feat(accounts): add custom User model`
-  - Done notes:
+  - Done notes: Implemented custom User model extending AbstractUser with unique email, phone, city, neighborhood, bio, and is_email_verified; configured custom UserAdmin with fieldsets, list_display, search_fields and filters; generated and applied 0001_initial migration on PostgreSQL; verified via check, migrate, and shell createsuperuser tests.
 
 - [ ] **P1-05 catalog models**
   - Files: `backend/catalog/models.py`, `admin.py`, migration.
