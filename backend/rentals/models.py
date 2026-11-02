@@ -1,3 +1,236 @@
-from django.db import models
+from decimal import Decimal
 
-# Create your models here.
+from django.conf import settings
+from django.core.exceptions import ValidationError
+from django.db import models
+from django.utils.translation import gettext_lazy as _
+
+
+class Rental(models.Model):
+    class DeliveryMethod(models.TextChoices):
+        PICKUP = "pickup", _("Pickup")
+        COURIER = "courier", _("Courier")
+
+    class Status(models.TextChoices):
+        PENDING_PAYMENT = "pending_payment", _("Pending payment")
+        CONFIRMED = "confirmed", _("Confirmed")
+        HANDED_OVER = "handed_over", _("Handed over")
+        RETURNED = "returned", _("Returned")
+        COMPLETED = "completed", _("Completed")
+        CANCELLED = "cancelled", _("Cancelled")
+        DISPUTED = "disputed", _("Disputed")
+
+    item = models.ForeignKey(
+        "catalog.Item",
+        on_delete=models.PROTECT,
+        related_name="rentals",
+        verbose_name=_("item"),
+    )
+    renter = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.PROTECT,
+        related_name="rentals",
+        verbose_name=_("renter"),
+    )
+    start_at = models.DateTimeField(_("start at"))
+    end_at = models.DateTimeField(_("end at"))
+    delivery_method = models.CharField(
+        _("delivery method"),
+        max_length=20,
+        choices=DeliveryMethod.choices,
+        default=DeliveryMethod.PICKUP,
+    )
+    status = models.CharField(
+        _("status"),
+        max_length=20,
+        choices=Status.choices,
+        default=Status.PENDING_PAYMENT,
+    )
+    rent_amount = models.DecimalField(
+        _("rent amount"),
+        max_digits=12,
+        decimal_places=0,
+    )
+    deposit_amount = models.DecimalField(
+        _("deposit amount"),
+        max_digits=12,
+        decimal_places=0,
+        default=0,
+    )
+    commission_rate = models.DecimalField(
+        _("commission rate"),
+        max_digits=4,
+        decimal_places=2,
+        default=Decimal("0.15"),
+    )
+    commission_amount = models.DecimalField(
+        _("commission amount"),
+        max_digits=12,
+        decimal_places=0,
+        default=0,
+    )
+    owner_payout = models.DecimalField(
+        _("owner payout"),
+        max_digits=12,
+        decimal_places=0,
+        default=0,
+    )
+    tracking_code = models.CharField(
+        _("tracking code"),
+        max_length=64,
+        unique=True,
+        null=True,
+        blank=True,
+    )
+    created_at = models.DateTimeField(_("created at"), auto_now_add=True)
+    updated_at = models.DateTimeField(_("updated at"), auto_now=True)
+
+    class Meta:
+        verbose_name = _("rental")
+        verbose_name_plural = _("rentals")
+        ordering = ["-created_at"]
+        constraints = [
+            models.CheckConstraint(
+                condition=models.Q(end_at__gt=models.F("start_at")),
+                name="rental_end_after_start",
+            ),
+        ]
+
+    def __str__(self):
+        item_title = getattr(self.item, "title", self.item_id)
+        renter_name = getattr(self.renter, "username", self.renter_id)
+        return f"Rental #{self.pk or 'new'} - {item_title} by {renter_name}"
+
+    def clean(self):
+        super().clean()
+
+        if self.start_at and self.end_at and self.end_at <= self.start_at:
+            raise ValidationError(
+                {"end_at": _("End date and time must be after start date and time.")}
+            )
+
+        if hasattr(self, "item") and hasattr(self, "renter"):
+            if self.item_id and self.renter_id and self.item.owner_id == self.renter_id:
+                raise ValidationError(
+                    {"renter": _("The owner cannot rent their own item.")}
+                )
+
+        if hasattr(self, "item") and self.item_id and self.start_at and self.end_at:
+            overlapping_qs = Rental.objects.filter(
+                item_id=self.item_id,
+                start_at__lt=self.end_at,
+                end_at__gt=self.start_at,
+            ).exclude(status=self.Status.CANCELLED)
+
+            if self.pk:
+                overlapping_qs = overlapping_qs.exclude(pk=self.pk)
+
+            if overlapping_qs.exists():
+                raise ValidationError(
+                    _("This item is already booked for an overlapping time period.")
+                )
+
+
+class Payment(models.Model):
+    class Kind(models.TextChoices):
+        RENT = "rent", _("Rent")
+        DEPOSIT = "deposit", _("Deposit")
+        DEPOSIT_REFUND = "deposit_refund", _("Deposit refund")
+        PAYOUT = "payout", _("Owner payout")
+
+    class Status(models.TextChoices):
+        SUCCESS = "success", _("Success")
+        FAILED = "failed", _("Failed")
+
+    rental = models.ForeignKey(
+        Rental,
+        on_delete=models.CASCADE,
+        related_name="payments",
+        verbose_name=_("rental"),
+    )
+    kind = models.CharField(
+        _("kind"),
+        max_length=20,
+        choices=Kind.choices,
+    )
+    amount = models.DecimalField(
+        _("amount"),
+        max_digits=12,
+        decimal_places=0,
+    )
+    status = models.CharField(
+        _("status"),
+        max_length=20,
+        choices=Status.choices,
+        default=Status.SUCCESS,
+    )
+    receipt_no = models.CharField(
+        _("receipt number"),
+        max_length=64,
+        unique=True,
+    )
+    created_at = models.DateTimeField(_("created at"), auto_now_add=True)
+
+    class Meta:
+        verbose_name = _("payment")
+        verbose_name_plural = _("payments")
+        ordering = ["-created_at"]
+
+    def __str__(self):
+        return f"Payment {self.receipt_no} - {self.get_kind_display()} ({self.amount})"
+
+
+class Dispute(models.Model):
+    class Status(models.TextChoices):
+        OPEN = "open", _("Open")
+        RESOLVED = "resolved", _("Resolved")
+
+    class DepositDecision(models.TextChoices):
+        RETURN_TO_RENTER = "return_to_renter", _("Return to renter")
+        GIVE_TO_OWNER = "give_to_owner", _("Give to owner")
+        SPLIT = "split", _("Split")
+
+    rental = models.ForeignKey(
+        Rental,
+        on_delete=models.PROTECT,
+        related_name="disputes",
+        verbose_name=_("rental"),
+    )
+    opened_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.PROTECT,
+        related_name="opened_disputes",
+        verbose_name=_("opened by"),
+    )
+    reason = models.TextField(_("reason"))
+    status = models.CharField(
+        _("status"),
+        max_length=20,
+        choices=Status.choices,
+        default=Status.OPEN,
+    )
+    deposit_decision = models.CharField(
+        _("deposit decision"),
+        max_length=20,
+        choices=DepositDecision.choices,
+        blank=True,
+    )
+    resolution_note = models.TextField(_("resolution note"), blank=True)
+    resolved_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="resolved_disputes",
+        verbose_name=_("resolved by"),
+    )
+    resolved_at = models.DateTimeField(_("resolved at"), null=True, blank=True)
+    created_at = models.DateTimeField(_("created at"), auto_now_add=True)
+
+    class Meta:
+        verbose_name = _("dispute")
+        verbose_name_plural = _("disputes")
+        ordering = ["-created_at"]
+
+    def __str__(self):
+        return f"Dispute #{self.pk or 'new'} for Rental #{self.rental_id}"
