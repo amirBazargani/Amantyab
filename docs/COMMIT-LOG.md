@@ -79,3 +79,22 @@
 - اگر استاد بپرسد: چرا برای جلوگیری از تداخل رزرو (Double-Booking) از متد `clean()` استفاده کردی و کوئری آن چگونه کار می‌کند؟ پاسخ: دو بازه زمانی $[A, B]$ و $[C, D]$ در صورتی با یکدیگر تداخل دارند که $A < D$ و $B > C$ برقرار باشد. در متد `clean()` با فیلتر روی `start_at__lt=self.end_at` و `end_at__gt=self.start_at` روی اجاره‌های غیرلغوشده همان کالا بررسی می‌کنیم که هم‌پوشانی وجود نداشته باشد و در صورت وجود، خطای `ValidationError` برگردانده شود.
 
 ---
+
+### 49add6b — feat(reviews): add Review model
+- تسک: P1-07
+- چه چیزی تغییر کرد: پیاده‌سازی مدل `Review` در `backend/reviews/models.py`؛ افزودن قید پایگاه داده `review_rating_range_1_to_5` و قید یکتایی `unique_rental_reviewer_review`؛ پیاده‌سازی متد `clean()` برای کنترل ثبت نظر فقط در وضعیت `completed`، ممنوعیت نظر به خود، و انطباق طرفین با قرارداد اجاره؛ پیکربندی پنل مدیریت در `backend/reviews/admin.py`؛ تولید و اجرای مایگریشن `0001_initial.py` روی PostgreSQL.
+- چرا لازم بود: ایجاد اعتماد و شفافیت در سامانه‌های همتابه‌همتا (P2P) وابسته به سیستم امتیازدهی و بازخورد دوطرفه است. تضمین این که هر طرف قرارداد حداکثر یک بار نظر می‌دهد و امتیاز همواره در بازه معتبر ۱ تا ۵ قرار دارد در سطح پایگاه داده الزامی است.
+- فایل‌های مهم: `backend/reviews/models.py`, `backend/reviews/admin.py`, `backend/reviews/migrations/0001_initial.py`
+- مفهوم جنگو/پایتون که استفاده شد: ارتباطات کلید خارجی (`ForeignKey`) با `CASCADE`، قیدهای پیشرفته پایگاه داده (`models.CheckConstraint` و `models.UniqueConstraint`)، انتخاب‌های متنی (`models.TextChoices`)، متد اعتبارسنجی مدل (`clean`) و کلاس مدیریت ادمین (`admin.ModelAdmin`).
+- اگر استاد بپرسد: چرا اعتبارسنجی امتیاز ۱ تا ۵ را هم در دیتابیس با `CheckConstraint` و هم با فیلد `PositiveSmallIntegerField` گذاشتی؟ پاسخ: فیلد `PositiveSmallIntegerField` در فرم‌ها کمک می‌کند، اما در سطح PostgreSQL صرفاً یک ستون عدد صحیح مثبت است؛ برای جلوگیری قطعی از ورود مقادیر غیرمجاز مانند ۰ یا ۶ در تراکنش‌ها و اسکریپت‌ها، قید صریح `CheckConstraint(condition=models.Q(rating__gte=1, rating__lte=5))` تعریف شد تا در بنیادی‌ترین سطح دیتابیس `IntegrityError` تولید شود.
+
+---
+
+### b9996f5 — feat(chat): add Conversation and Message models
+- تسک: P1-07
+- چه چیزی تغییر کرد: پیاده‌سازی مدل‌های `Conversation` و `Message` در `backend/chat/models.py`؛ ایجاد قید یکتایی پایگاه داده `unique_item_renter_conversation` روی `(item, renter)`؛ ایجاد متد اعتبارسنجی `clean()` برای ممانعت از شروع گفتگوی مالک با کالای خودش و اطمینان از مجاز بودن فرستنده پیام؛ پیکربندی پنل مدیریت در `backend/chat/admin.py` با `MessageInline` و کلاس مجزای `MessageAdmin`؛ تولید و اجرای مایگریشن `0001_initial.py` روی PostgreSQL.
+- چرا لازم بود: کاربران قبل از اجاره نیازمند هماهنگی درباره زمان تحویل، بررسی سلامت کالا و پرسش و پاسخ با مالک هستند. ایزوله کردن گفتگوها به ازای هر کالا و متقاضی مانع از سردرگمی پیام‌ها و ایجاد چت‌های تکراری و موازی می‌شود.
+- فایل‌های مهم: `backend/chat/models.py`, `backend/chat/admin.py`, `backend/chat/migrations/0001_initial.py`
+- مفهوم جنگو/پایتون که استفاده شد: ارتباطات رابطه‌ای والد-فرزند (`Conversation` و `Message`)، قید یکتایی ترکیبی (`models.UniqueConstraint`)، پراپرتی پایتون (`@property def owner(self): return self.item.owner`)، اعتبارسنجی فرستنده با `clean()` و اینلاین فرم‌ها در پنل ادمین (`admin.TabularInline`).
+- اگر استاد بپرسد: چرا در مدل `Conversation` فیلد مستقلی برای `owner` ذخیره نکردی و به صورت پراپرتی از `item.owner` خواندی؟ پاسخ: رعایت اصل نرمال‌سازی داده‌ها (Normalization). مالک کالا قبلاً در مدل `Item` مشخص شده است؛ اگر فیلد دیگری برای مالک در `Conversation` ذخیره می‌کردیم افزونگی داده (Data Redundancy) ایجاد می‌شد و در صورت هرگونه تغییر کالا احتمال عدم هماهنگی داده‌ها وجود داشت.
+
