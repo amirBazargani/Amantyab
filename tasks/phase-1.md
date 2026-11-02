@@ -2,13 +2,13 @@
 PDF scope: define apps · design app/web processes · design and define models.
 Rule: do NOT write views/urls/templates/forms in this phase.
 
-- [ ] **P1-01 Repo and environment**
+- [x] **P1-01 Repo and environment**
   - Goal: working Django project on PostgreSQL, pushed to GitHub.
   - Files: `backend/` (Django project named `config`), `backend/requirements.txt`, `backend/.env.example`, `.gitignore`, `docker-compose.yml`, `README.md`.
   - Steps: create venv; install Django, psycopg[binary], python-dotenv, Pillow; `django-admin startproject config backend`; settings read env (SECRET_KEY, DEBUG, DB_NAME/USER/PASSWORD/HOST/PORT); LANGUAGE_CODE='fa', TIME_ZONE='Asia/Tehran', USE_TZ=True; MEDIA/STATIC config; `docker compose up -d` Postgres; first commit; add GitHub remote; push `main`.
   - Acceptance: `python manage.py check` OK; `python manage.py migrate` runs on PostgreSQL; `.env` is git-ignored; repo visible on GitHub.
   - Commits: `chore: initialize Django project with PostgreSQL settings` · `chore: add docker-compose, env example and gitignore`
-  - Done notes:
+  - Done notes: Django 6.1 config project initialized; PostgreSQL 16 running via Docker Compose; psycopg 3 and python-dotenv configured; fa/Asia/Tehran set; static and media configured; .env git-ignored; verified via check and migrate.
 
 - [ ] **P1-02 Create apps + custom user setting**
   - Goal: apps exist and are installed; `AUTH_USER_MODEL` set BEFORE any migrate.
