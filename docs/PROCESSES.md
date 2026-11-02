@@ -1,49 +1,154 @@
-# PROCESSES — website process diagrams (draft; finalised in P1-03)
-Persian labels are fine in the final version. Render with any mermaid viewer (GitHub renders them).
+# PROCESSES — فرآیندهای کسب‌وکار و نمودارهای سامانه امانت‌یاب
 
-## 1. Whole website
+این مستند فرآیندهای عملیاتی، جریان داده و ماشین وضعیت سیستم امانت‌سپاری محله‌محور «امانت‌یاب» را تشریح می‌کند. تمامی نمودارها با استاندارد Mermaid پیاده‌سازی شده و مستقیماً در مخزن GitHub قابل مشاهده و رندر هستند.
+
+---
+
+## ۱. فرآیند کلی وب‌سایت (Whole Website Process)
+این نمودار، سفر کاربر (User Journey) را از لحظه ورود به عنوان بازدیدکننده مهمان، ثبت‌نام و ورود، تا مشاهده، هماهنگی، اجاره کالا، تحویل و ثبت بازخورد، و همچنین مسیر حل اختلاف نشان می‌دهد.
+
 ```mermaid
 flowchart TD
-  A[Visitor] --> B{Has account?}
-  B -- no --> C[Sign up + email verification]
-  B -- yes --> D[Log in]
-  C --> D
-  D --> E[Home: search items]
-  D --> F[My items: create / edit / pause]
-  E --> G[Item detail + reviews + chat]
-  G --> H[Rental request: dates + delivery]
-  H --> I[Simulated payment: rent + deposit]
-  I --> J[Receipt + tracking code]
-  J --> K[Owner hands over item]
-  K --> L[Renter returns item]
-  L --> M[Owner confirms return -> completed]
-  M --> N[Two-way reviews]
-  K --> O[Dispute]
-  L --> O
-  O --> P[Admin resolves + deposit decision]
+  Guest["بازدیدکننده / مهمان"] --> AuthCheck{"آیا حساب کاربری دارد؟"}
+  AuthCheck -- "خیر" --> SignUp["ثبت‌نام کاربر (نام کاربری، ایمیل معتبر، رمز، شهر و محله)"]
+  AuthCheck -- "بله" --> Login["ورود به حساب کاربری (نشست امن Django Session)"]
+  SignUp --> Login
+  
+  Login --> Dashboard{"هدف کاربر چیست؟"}
+  
+  Dashboard -- "سپردن کالا (موجر)" --> ManageItems["مدیریت کالاهای من (ثبت، ویرایش، تصاویر، فعال/غیرفعال‌سازی)"]
+  ManageItems --> CatalogLive["انتشار کالا در کاتالوگ محله"]
+  
+  Dashboard -- "اجاره کالا (مستأجر)" --> SearchCatalog["جستجو و فیلتر در کاتالوگ (دسته‌بندی، شهر، محله، قیمت)"]
+  CatalogLive --> SearchCatalog
+  
+  SearchCatalog --> ItemDetail["مشاهده صفحه جزئیات کالا، تصاویر، ودیعه و امتیاز موجر"]
+  ItemDetail --> ChatDecision{"نیاز به پرسش یا هماهنگی با موجر؟"}
+  ChatDecision -- "بله" --> ChatSystem["ارسال پیام متنی در چت اختصاصی کالا"]
+  ChatDecision -- "خیر" --> RentRequest["ثبت درخواست اجاره (انتخاب تاریخ شروع و پایان و نحوه تحویل)"]
+  ChatSystem --> RentRequest
+  
+  RentRequest --> CostCalc["اعتبارسنجی تداخل زمانی و محاسبه هزینه اجاره، ودیعه و کارمزد"]
+  CostCalc --> PaymentSim["پرداخت شبیه‌سازی‌شده (ثبت فاکتور در جدول Payment)"]
+  PaymentSim --> RentalConfirmed["تأیید اجاره و صدور کد رهگیری یکتا (وضعیت: confirmed)"]
+  
+  RentalConfirmed --> Handover["تحویل فیزیکی کالا (حضوری / پیک) و تأیید موجر (وضعیت: handed_over)"]
+  Handover --> InUse["استفاده در بازه زمانی توافق‌شده"]
+  InUse --> ReturnItem["بازگرداندن کالا توسط مستأجر (وضعیت: returned)"]
+  
+  ReturnItem --> Inspection{"آیا کالا بدون آسیب و بموقع بازگشت؟"}
+  Inspection -- "بله (تأیید سلامت کالا توسط موجر)" --> RentalCompleted["تکمیل فرآیند و آزادسازی ودیعه (وضعیت: completed)"]
+  RentalCompleted --> TwoWayReview["ثبت امتیاز و دیدگاه دوطرفه (موجر و مستأجر نسبت به یکدیگر)"]
+  
+  InUse -. "بروز نقص، مفقودی یا عدم تحویل" .-> DisputeFlow["ثبت اختلاف توسط یکی از طرفین (وضعیت: disputed)"]
+  Inspection -- "خیر (خسارت یا تاخیر)" --> DisputeFlow
+  DisputeFlow --> AdminResolve["رسیدگی مدیر سامانه (is_staff)، تعیین وضعیت ودیعه و مختومه کردن"]
+  AdminResolve --> RentalCompleted
 ```
 
-## 2. Rental state machine
+---
+
+## ۲. ماشین وضعیت چرخه اجاره (Rental State Machine)
+چرخه عمر هر سفارش اجاره از لحظه ایجاد درخواست تا پایان، با رعایت دقیق شروط و محدودیت‌های مدل `Rental`، در قالب نمودار حالت زیر مدیریت می‌شود.
+
 ```mermaid
 stateDiagram-v2
-  [*] --> pending_payment
-  pending_payment --> confirmed: payment success
-  pending_payment --> cancelled: renter cancels / timeout
-  confirmed --> cancelled: either side cancels
-  confirmed --> handed_over: owner confirms handover
-  handed_over --> returned: renter returns
-  returned --> completed: owner confirms OK
-  handed_over --> disputed
-  returned --> disputed
-  disputed --> completed: admin resolves
+  [*] --> pending_payment: ثبت فرم رزرو و تاریخ‌ها
+  
+  pending_payment --> confirmed: پرداخت شبیه‌سازی‌شده موفق
+  pending_payment --> cancelled: انصراف مستأجر یا عدم پرداخت
+  
+  confirmed --> cancelled: لغو توافقی پیش از تحویل کالا
+  confirmed --> handed_over: تأیید تحویل فیزیکی کالا توسط موجر
+  
+  handed_over --> returned: اعلام بازگرداندن کالا توسط مستأجر
+  handed_over --> disputed: ثبت اختلاف حین دوره اجاره (نقص فنی / مفقودی)
+  
+  returned --> completed: تأیید سلامت کالا توسط موجر و آزادسازی ودیعه
+  returned --> disputed: ثبت اختلاف در زمان دریافت (خسارت، کسر قطعات، تاخیر)
+  
+  disputed --> completed: داوری مدیر سامانه، ثبت تصمیم ودیعه و تسویه نهایی
+  
   completed --> [*]
   cancelled --> [*]
 ```
 
-## 3. Per-app process description (to be written in Persian in P1-03 → REPORT.md §2)
-- accounts: sign up, email verification (P4), login/logout, profile edit, public profile with rating.
-- catalog: owner CRUD items + images, pause/activate, public list/search/filter, detail.
-- rentals: request, cost calculation, overlap check, simulated payment, receipt, lifecycle actions, cancellation, dispute open/resolve.
-- reviews: after completed rental both sides rate 1–5 + comment; averages on profiles and items.
-- chat: renter asks owner questions from the item page (conversation per item+renter).
-- core: base layout, logging middleware, cookies/session helpers, error pages.
+### شرح وضعیت‌های اجاره:
+1. **`pending_payment`:** درخواست اجاره با تاریخ شروع و پایان انتخاب شده، اما هزینه و ودیعه هنوز واریز نشده است.
+2. **`confirmed`:** پرداخت ودیعه و هزینه اجاره با موفقیت شبیه‌سازی شده و کالا برای مستأجر رزرو قطعی شده است (کد رهگیری صادر شده است).
+3. **`handed_over`:** کالا در محل مشخص‌شده (حضوری یا پیک) به مستأجر تحویل داده شده و موجر این مرحله را در سامانه تأیید کرده است.
+4. **`returned`:** مستأجر پس از پایان استفاده، کالا را پس فرستاده یا تحویل داده و وضعیت استرداد را اعلام نموده است.
+5. **`completed`:** موجر سلامت کالا را تأیید کرده، ودیعه آزاد شده و فرآیند تسویه کامل شده است؛ در این وضعیت امکان ثبت دیدگاه و امتیاز دوطرفه فعال می‌شود.
+6. **`cancelled`:** اجاره پیش از تحویل کالا (در حالت انتظار پرداخت یا تایید) توسط کاربر یا سیستم لغو شده است.
+7. **`disputed`:** در صورت بروز اختلاف بر سر خسارت، عدم بازگشت کالا یا نقض توافق، پرونده قفل شده و به مدیر ارجاع می‌گردد.
+
+---
+
+## ۳. فرآیند جستجو تا ثبت و پرداخت اجاره (Search to Rent Flow)
+این جریان نحوه فیلتر کردن کالاهای محله، بررسی عدم هم‌پوشانی تاریخ‌ها (Overlap Check)، محاسبه نرخ روزانه/ساعتی و کارمزد، و پرداخت شبیه‌سازی‌شده را به تصویر می‌کشد.
+
+```mermaid
+flowchart TD
+  Start["ورود به سامانه / فهرست کالاها"] --> FilterCatalog["اعمال فیلترها (شهر، محله، دسته‌بندی و سقف قیمت)"]
+  FilterCatalog --> ItemCard["مشاهده کارت کالاها و انتخاب کالای مورد نظر"]
+  ItemCard --> ItemView["صفحه اختصاصی کالا (بررسی تصاویر، توضیحات، شرایط ودیعه و امتیاز مالک)"]
+  
+  ItemView --> NeedInfo{"نیاز به گفتگو یا هماهنگی قبلی؟"}
+  NeedInfo -- "بله" --> OpenChat["باز کردن چت اختصاصی و گفتگو با مالک کالا"]
+  NeedInfo -- "خیر" --> SelectDates["انتخاب بازه زمانی (تاریخ و ساعت شروع / تاریخ و ساعت پایان)"]
+  OpenChat --> SelectDates
+  
+  SelectDates --> CheckSelfRent{"آیا مستأجر، خود مالک کالاست؟"}
+  CheckSelfRent -- "بله" --> ErrSelf["خطای اعتبارسنجی (موجر نمی‌تواند کالای خود را اجاره کند)"]
+  ErrSelf --> SelectDates
+  
+  CheckSelfRent -- "خیر" --> CheckOverlap{"بررسی تداخل زمانی (Overlap Query) با سفارش‌های فعال"}
+  CheckOverlap -- "دارای تداخل زمانی" --> ErrOverlap["نمایش خطا: کالا در این بازه در دسترس نیست"]
+  ErrOverlap --> SelectDates
+  
+  CheckOverlap -- "فاقد تداخل" --> SelectDelivery["انتخاب شیوه تحویل (تحویل حضوری / ارسال با پیک) بر اساس تنظیمات کالا"]
+  
+  SelectDelivery --> PriceEngine["موتور محاسبه قیمت (محاسبه اجاره روزانه یا ساعتی، ودیعه و کارمزد ۱۵٪)"]
+  PriceEngine --> Invoice["پیش‌فاکتور شفاف (مبلغ اجاره، مبلغ ودیعه و شیوه تحویل)"]
+  Invoice --> PayAction["اقدام به پرداخت شبیه‌سازی‌شده (ثبت سطرهای Payment با وضعیت success)"]
+  PayAction --> IssueReceipt["صدور شماره رسید، ثبت tracking_code در سفارش و ارسال به وضعیت confirmed"]
+```
+
+---
+
+## ۴. فرآیند ثبت و رسیدگی به اختلاف (Dispute Resolution Flow)
+در صورتی که کالا دچار آسیب‌دیدگی شود، به موقع مسترد نگردد، یا مغایر با مشخصات اعلامی باشد، فرآیند داوری شفاف توسط مدیر طبق نمودار زیر اجرا می‌گردد:
+
+```mermaid
+flowchart TD
+  DisputeTrigger["وقوع مشکل در مرحله تحویل (handed_over) یا استرداد (returned)"] --> OpenForm["ثبت فرم اختلاف توسط مستأجر یا موجر همراه با شرح دلایل و مستندات"]
+  OpenForm --> StatusDisputed["تغییر وضعیت سفارش اجاره به disputed"]
+  StatusDisputed --> LockFunds["مسدودسازی خودکار تسویه مالی و عودت ودیعه تا زمان صدور رأی"]
+  
+  LockFunds --> AdminPanel["نمایش پرونده در پنل مدیریت سامانه (ویژه کاربران دارای سطح is_staff)"]
+  AdminPanel --> ReviewEvidence["بررسی ادعای طرفین، سوابق چت، لاگ‌های تغییر وضعیت و یادداشت‌ها توسط مدیر"]
+  
+  ReviewEvidence --> AdminDecision{"تصمیم نهایی مدیر در خصوص مبلغ ودیعه"}
+  
+  AdminDecision -- "حق با مستأجر است (عدم سلامت کالا / لغو از سوی موجر)" --> ToRenter["return_to_renter: استرداد کل مبلغ ودیعه به مستأجر"]
+  AdminDecision -- "حق با موجر است (ورود خسارت فیزیکی / عدم استرداد)" --> ToOwner["give_to_owner: واگذاری کل ودیعه به موجر جهت جبران خسارت"]
+  AdminDecision -- "قصور مشترک / توافق مرضی‌الطرفین" --> Split["split: تسهیم و تقسیم بخشی از ودیعه میان موجر و مستأجر"]
+  
+  ToRenter --> FinalizeDispute["ثبت تصمیم، متن یادداشت داوری (resolution_note)، ثبت شناسه مدیر و زمان حل"]
+  ToOwner --> FinalizeDispute
+  Split --> FinalizeDispute
+  
+  FinalizeDispute --> ExecutePayments["صدور تراکنش‌های مالی شبیه‌سازی‌شده تسویه بر اساس رأی صادره"]
+  ExecutePayments --> CloseRental["تغییر وضعیت اجاره به completed و بایگانی پرونده اختلاف"]
+```
+
+---
+
+## ۵. خلاصه فرآیندهای به تفکیک اپلیکیشن‌های پروژه
+
+- **`accounts`:** مدیریت چرخه ثبت‌نام کاربر با ایمیل یکتا، ورود امن با نشست جنگو، ویرایش اطلاعات محلی (شهر و محله) و تلفن، مدیریت نقش‌های سیستمی (تفکیک کاربر عادی و ادمین صرفاً با فلگ استاندارد `is_staff`).
+- **`catalog`:** مدیریت دسته‌بندی‌های کاتالوگ با ساختار خودارجاعی (درخت دسته‌ها)، ایجاد و ویرایش کالاهای امانتی توسط مالکین با شرایط فیزیکی، قیمت‌گذاری روزانه/ساعتی و مبلغ ودیعه، مدیریت چند تصویر به ازای هر کالا با تعیین تصویر اصلی، و قابلیت تعلیق موقت آگهی (`is_active`).
+- **`rentals`:** هسته مدیریت رزرو و چرخه عمر امانت، اعتبارسنجی قیود زمانی و عدم هم‌پوشانی رزروها (Double-booking prevention)، شبیه‌سازی پرداخت و ثبت تراکنش‌های واریز/استرداد ودیعه، پیگیری سفارش با کد رهگیری، و داوری پرونده‌های اختلاف.
+- **`reviews`:** ثبت بازخورد و امتیاز ۱ تا ۵ ستاره به همراه متن نظر به صورت دوطرفه (موجر به مستأجر و بالعکس) منحصراً پس از اتمام موفقیت‌آمیز اجاره (`completed`)، با قید یکتایی مانع از ثبت مجدد نظر در هر معامله.
+- **`chat`:** ایجاد گفتگوی دونفره بر بستر هر کالای کاتالوگ میان متقاضی اجاره و مالک آن، ثبت پیام‌ها با وضعیت خوانده‌شده، و تسهیل هماهنگی‌های محلی پیش و حین اجاره بدون نیاز به اشتراک اطلاعات تماس خصوصی.
+- **`core`:** زیرساخت اشتراکی سامانه، ارائه‌دهنده قالب پایه (Base Layout) با استانداردهای RTL و فونت وزیرمتن، میدل‌ور ثبت لاگ درخواست‌ها، ابزارهای مدیریت کوکی و سشن، و صفحات خطای سفارشی ۴۰۴ و ۵۰۰.
