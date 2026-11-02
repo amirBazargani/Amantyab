@@ -45,11 +45,11 @@ Rule: do NOT write views/urls/templates/forms in this phase.
   - Commit: `feat(rentals): add Rental, Payment and Dispute models`
   - Done notes: Implemented Rental (status and delivery method choices, money fields, tracking code, rental_end_after_start CheckConstraint, clean() validating owner!=renter and overlap prevention against non-cancelled rentals), Payment (receipt_no, kind, status, amount), and Dispute (reason, status, deposit_decision, resolution tracking); configured RentalAdmin with PaymentInline and DisputeInline, PaymentAdmin, and DisputeAdmin; generated and applied 0001_initial migration on PostgreSQL; verified constraints, clean() validations, and payment/dispute creation in shell.
 
-- [ ] **P1-07 reviews and chat models**
+- [x] **P1-07 reviews and chat models**
   - Files: `backend/reviews/models.py`, `backend/chat/models.py`, both `admin.py`, migrations.
   - Acceptance: migrate OK; duplicate (rental, reviewer) review raises IntegrityError; rating 6 raises IntegrityError.
   - Commits: `feat(reviews): add Review model` · `feat(chat): add Conversation and Message models`
-  - Done notes:
+  - Done notes: Implemented Review model (rental, reviewer, reviewee, reviewee_role, rating with 1-5 CheckConstraint, duplicate prevention UniqueConstraint, clean() validating completed status and parties); implemented Conversation (item, renter, unique constraint, owner property, clean() self-chat check) and Message (conversation, sender, body, is_read, sender membership clean()); configured ReviewAdmin, ConversationAdmin with MessageInline, and MessageAdmin; created and applied 0001_initial migrations on PostgreSQL; verified constraints and clean validations in shell.
 
 - [ ] **P1-08 Phase 1 wrap-up**
   - Goal: everything registered in admin, docs match code, phase gate.
