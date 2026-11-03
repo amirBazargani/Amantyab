@@ -25,7 +25,7 @@ Money = DecimalField(max_digits=12, decimal_places=0). All models have `created_
 - UniqueConstraint (rental, reviewer): each side reviews once per rental. Allowed only when rental.status == completed.
 
 ## chat
-**Conversation**: item (FK), renter (FK User); UniqueConstraint (item, renter). Owner = item.owner.
+**Conversation**: item (FK), renter (FK User), updated_at; UniqueConstraint (item, renter). Owner = item.owner.
 **Message**: conversation (FK), sender (FK User), body, is_read (bool)
 
 ## core

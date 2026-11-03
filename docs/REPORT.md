@@ -155,7 +155,259 @@ flowchart TD
 ---
 
 ## ۳. مدل‌ها و روابط بین آن‌ها
-(جدول هر مدل: فیلدها، نوع، قیود + نمودار ER از docs/DOMAIN.md)
+
+در سامانه «امانت‌یاب»، ساختار داده‌ها بر پایه اصول طراحی رابطه‌ای (Relational Database Design) و نرمال‌سازی مناسب جهت پلتفرم همتابه‌همتا پیاده‌سازی شده است. تمام مدل‌های سامانه از پایگاه داده قدرتمند PostgreSQL استفاده می‌کنند. مقادیر مالی با دقت صفر رقم اعشار و حداکثر ۱۲ رقم (`numeric(12, 0)`) مدل‌سازی شده‌اند و کلیه جداول دارای فیلد ره‌گیری زمانی درج (`created_at`) و در صورت نیاز آخرین به‌روزرسانی (`updated_at`) هستند.
+
+### ۳-۱. نمودار موجودیت-رابطه (ER Diagram)
+
+نمودار زیر پیوندها و ماهیت روابط (یک‌به‌چند و چندبه‌چند مفهومی) میان ۱۰ مدل اصلی سامانه را نمایش می‌دهد:
+
+```mermaid
+erDiagram
+  User ||--o{ Item : owns
+  Category ||--o{ Item : classifies
+  Item ||--o{ ItemImage : has
+  Item ||--o{ Rental : "is rented in"
+  User ||--o{ Rental : rents
+  Rental ||--o{ Payment : has
+  Rental ||--o{ Dispute : may_have
+  Rental ||--o{ Review : "gets (max 2)"
+  User ||--o{ Review : writes
+  Item ||--o{ Conversation : about
+  User ||--o{ Conversation : starts
+  Conversation ||--o{ Message : contains
+```
+
+---
+
+### ۳-۲. جداول مشخصات مدل‌ها به تفکیک اپلیکیشن
+
+#### ۱. اپلیکیشن `accounts`
+
+##### مدل `User`
+مدل سفارشی کاربر که با ارث‌بری از `AbstractUser` توسعه یافته است. در سامانه نقش‌های صلب وجود ندارد و هر کاربر بر حسب کانتکست تراکنش می‌تواند موجر یا مستأجر باشد؛ کاربران دارای `is_staff=True` به عنوان مدیر سامانه در نظر گرفته می‌شوند.
+
+| نام فیلد | نوع در جنگو | نوع در PostgreSQL | مشخصات و پیش‌فرض | توضیحات و قیود |
+|---|---|---|---|---|
+| `id` | `BigAutoField` | `bigint` | Primary Key, Auto-increment | شناسه یکتای کاربر در سیستم |
+| `username` | `CharField(150)` | `varchar(150)` | `unique=True`, اجباری | نام کاربری یکتا برای احراز هویت |
+| `first_name` | `CharField(150)` | `varchar(150)` | `blank=True` | نام کوچک کاربر |
+| `last_name` | `CharField(150)` | `varchar(150)` | `blank=True` | نام خانوادگی کاربر |
+| `email` | `EmailField(254)` | `varchar(254)` | `unique=True`, اجباری | پست الکترونیکی یکتا جهت اعتبارسنجی و بازیابی |
+| `phone` | `CharField(20)` | `varchar(20)` | `blank=True` | شماره تماس کاربر برای هماهنگی |
+| `city` | `CharField(100)` | `varchar(100)` | `blank=True` | شهر محل سکونت کاربر (پایه فیلتر محلی) |
+| `neighborhood` | `CharField(100)` | `varchar(100)` | `blank=True` | محله سکونت کاربر (پایه تطبیق همسایگی) |
+| `bio` | `TextField` | `text` | `blank=True` | بیوگرافی و توضیحات معرفی کاربر |
+| `is_email_verified` | `BooleanField` | `boolean` | `default=False` | پرچم تأیید ایمیل از طریق لینک فعال‌سازی |
+| `is_staff` | `BooleanField` | `boolean` | `default=False` | دسترسی مدیریتی (پنل داوری و نظارت) |
+| `is_active` | `BooleanField` | `boolean` | `default=True` | وضعیت فعال بودن حساب کاربری |
+| `is_superuser` | `BooleanField` | `boolean` | `default=False` | مدیر ارشد با تمام دسترسی‌های سیستم |
+| `date_joined` | `DateTimeField` | `timestamp with time zone` | `default=timezone.now` | زمان پیوستن کاربر به سامانه |
+| `last_login` | `DateTimeField` | `timestamp with time zone` | `null=True`, اختیاری | آخرین زمان ورود به حساب کاربری |
+
+---
+
+#### ۲. اپلیکیشن `catalog`
+
+##### مدل `Category`
+دسته‌بندی درختی و سلسله‌مراتبی کالاها برای ساختاردهی به ویترین کاتالوگ.
+
+| نام فیلد | نوع در جنگو | نوع در PostgreSQL | مشخصات و پیش‌فرض | توضیحات و قیود |
+|---|---|---|---|---|
+| `id` | `BigAutoField` | `bigint` | Primary Key, Auto-increment | شناسه دسته‌بندی |
+| `name` | `CharField(100)` | `varchar(100)` | اجباری | عنوان دسته‌بندی (مانند ابزار برقی) |
+| `slug` | `SlugField(120)` | `varchar(120)` | `unique=True`, `allow_unicode=True` | شناسه متنی سئو و آدرس یکتا (پشتیبانی یونیکد فارسی) |
+| `parent` | `ForeignKey('self')` | `bigint` | `null=True`, `blank=True`, `on_delete=CASCADE` | ارجاع به والد برای پشتیبانی از درخت تودرتو (`related_name="children"`) |
+| `created_at` | `DateTimeField` | `timestamp with time zone` | `auto_now_add=True` | زمان ثبت دسته‌بندی در سیستم |
+
+- **ترتیب پیش‌فرض (`ordering`):** بر اساس `["name"]`.
+
+##### مدل `Item`
+کالای قابل امانت‌سپاری که توسط موجر به اشتراک گذاشته می‌شود.
+
+| نام فیلد | نوع در جنگو | نوع در PostgreSQL | مشخصات و پیش‌فرض | توضیحات و قیود |
+|---|---|---|---|---|
+| `id` | `BigAutoField` | `bigint` | Primary Key, Auto-increment | شناسه یکتای کالا |
+| `owner` | `ForeignKey(User)` | `bigint` | `on_delete=CASCADE` | مالک کالا (کاربر موجر) (`related_name="items"`) |
+| `category` | `ForeignKey(Category)` | `bigint` | `on_delete=PROTECT` | دسته‌بندی کالا (حفاظت‌شده در برابر حذف دسته‌بندی) |
+| `title` | `CharField(200)` | `varchar(200)` | اجباری | عنوان آگهی کالا |
+| `description` | `TextField` | `text` | اجباری | توضیحات کامل وضعیت کالا و شرایط استفاده |
+| `brand` | `CharField(100)` | `varchar(100)` | `blank=True` | برند یا سازنده کالا |
+| `condition` | `CharField(20)` | `varchar(20)` | Choices (`new`, `like_new`, `good`, `fair`) | وضعیت کیفی و سلامت دستگاه |
+| `hourly_price` | `DecimalField(12, 0)` | `numeric(12, 0)` | `null=True`, `blank=True` | نرخ اجاره ساعتی (جهت اجاره‌های کمتر از ۲۴ ساعت) |
+| `daily_price` | `DecimalField(12, 0)` | `numeric(12, 0)` | اجباری | نرخ اجاره روزانه (پایه محاسبات فاکتور) |
+| `deposit_amount` | `DecimalField(12, 0)` | `numeric(12, 0)` | `default=0` | مبلغ ودیعه ضمانت امانت |
+| `city` | `CharField(100)` | `varchar(100)` | اجباری | شهر استقرار کالا جهت فیلتر و جستجو |
+| `neighborhood` | `CharField(100)` | `varchar(100)` | اجباری | محله کالا جهت محاسبه مسافت همسایگی |
+| `allow_pickup` | `BooleanField` | `boolean` | `default=True` | امکان تحویل حضوری کالا |
+| `allow_courier` | `BooleanField` | `boolean` | `default=False` | امکان ارسال با پیک |
+| `is_active` | `BooleanField` | `boolean` | `default=True` | فعال/غیرفعال بودن نمایش آگهی در کاتالوگ |
+| `created_at` | `DateTimeField` | `timestamp with time zone` | `auto_now_add=True` | تاریخ و زمان درج آگهی |
+| `updated_at` | `DateTimeField` | `timestamp with time zone` | `auto_now=True` | آخرین زمان ویرایش کالا |
+
+- **قیود پایگاه داده (`constraints`):**
+  1. `item_daily_price_positive`: قید شرطی `daily_price > 0` (نرخ روزانه باید همواره مثبت باشد).
+  2. `item_at_least_one_delivery_method`: قید شرطی `allow_pickup = True OR allow_courier = True` (حداقل یک روش تحویل باید مجاز باشد).
+- **شاخص‌های مرکب (`indexes`):**
+  1. `item_city_active_idx`: ایندکس ترکیبی روی فیلدهای `(city, is_active)` جهت تسریع جستجوهای پربسامد کاتالوگ.
+- **ترتیب پیش‌فرض (`ordering`):** بر اساس `["-created_at"]` (جدیدترین کالاها در ابتدا).
+
+##### مدل `ItemImage`
+تصاویر گالری کالا به همراه تعیین تصویر پیش‌فرض (کاور).
+
+| نام فیلد | نوع در جنگو | نوع در PostgreSQL | مشخصات و پیش‌فرض | توضیحات و قیود |
+|---|---|---|---|---|
+| `id` | `BigAutoField` | `bigint` | Primary Key, Auto-increment | شناسه تصویر |
+| `item` | `ForeignKey(Item)` | `bigint` | `on_delete=CASCADE` | کالای مربوطه (`related_name="images"`) |
+| `image` | `ImageField` | `varchar(100)` | `upload_to="items/%Y/%m/"` | مسیر ذخیره‌سازی تصویر کالا روی مدیا |
+| `is_primary` | `BooleanField` | `boolean` | `default=False` | پرچم نشان‌دهنده تصویر اصلی کالا در کارت‌ها |
+| `order` | `PositiveIntegerField` | `integer` | `default=0` | ترتیب نمایش تصاویر در گالری محصول |
+| `created_at` | `DateTimeField` | `timestamp with time zone` | `auto_now_add=True` | زمان بارگذاری تصویر |
+
+- **ترتیب پیش‌فرض (`ordering`):** بر اساس `["order", "id"]`.
+
+---
+
+#### ۳. اپلیکیشن `rentals`
+
+##### مدل `Rental`
+هسته سفارش اجاره که چرخه کامل حقوقی و مالی معامله میان موجر و مستأجر را ره‌گیری می‌کند.
+
+| نام فیلد | نوع در جنگو | نوع در PostgreSQL | مشخصات و پیش‌فرض | توضیحات و قیود |
+|---|---|---|---|---|
+| `id` | `BigAutoField` | `bigint` | Primary Key, Auto-increment | شماره فاکتور/شناسه رزرو |
+| `item` | `ForeignKey(Item)` | `bigint` | `on_delete=PROTECT` | کالای موضوع قرارداد اجاره (`related_name="rentals"`) |
+| `renter` | `ForeignKey(User)` | `bigint` | `on_delete=PROTECT` | کاربر مستأجر (`related_name="rentals"`) |
+| `start_at` | `DateTimeField` | `timestamp with time zone` | اجباری | تاریخ و ساعت آغاز دوره اجاره |
+| `end_at` | `DateTimeField` | `timestamp with time zone` | اجباری | تاریخ و ساعت پایان دوره اجاره |
+| `delivery_method` | `CharField(20)` | `varchar(20)` | Choices (`pickup`, `courier`), `default='pickup'` | روش تحویل توافق‌شده |
+| `status` | `CharField(20)` | `varchar(20)` | Choices (`pending_payment`, `confirmed`, `handed_over`, `returned`, `completed`, `cancelled`, `disputed`) | وضعیت کنونی در ماشین وضعیت سفارش |
+| `rent_amount` | `DecimalField(12, 0)` | `numeric(12, 0)` | اجباری | مبلغ کل هزینه اجاره محاسبه‌شده |
+| `deposit_amount` | `DecimalField(12, 0)` | `numeric(12, 0)` | `default=0` | مبلغ ودیعه ضمانت سلامت کالا |
+| `commission_rate` | `DecimalField(4, 2)` | `numeric(4, 2)` | `default=0.15` | درصد کارمزد پلتفرم (۱۵٪) |
+| `commission_amount` | `DecimalField(12, 0)` | `numeric(12, 0)` | `default=0` | سهم درآمدی سامانه از محل اجاره |
+| `owner_payout` | `DecimalField(12, 0)` | `numeric(12, 0)` | `default=0` | سهم خالص پرداختی به موجر (`rent_amount - commission_amount`) |
+| `tracking_code` | `CharField(64)` | `varchar(64)` | `unique=True`, `null=True`, `blank=True` | کد رهگیری یکتا و رسمی صادرشده پس از پرداخت |
+| `created_at` | `DateTimeField` | `timestamp with time zone` | `auto_now_add=True` | زمان ثبت درخواست اجاره |
+| `updated_at` | `DateTimeField` | `timestamp with time zone` | `auto_now=True` | آخرین زمان تغییر وضعیت یا اطلاعات |
+
+- **قیود پایگاه داده (`constraints`):**
+  1. `rental_end_after_start`: قید دیتابیسی `end_at > start_at` (تاریخ پایان باید حتماً بعد از تاریخ شروع باشد).
+- **قواعد اعتبارسنجی در سطح متد `clean()`:**
+  1. بررسی مجدد تقدم زمانی `end_at > start_at`.
+  2. بررسی عدم مالکیت: موجر کالا نمی‌تواند کالای متعلق به خود را اجاره کند (`renter != item.owner`).
+  3. جلوگیری از تداخل زمانی (Double-Booking Prevention): بررسی بازه زمانی سفارش با سایر سفارش‌های فعال و غیرلغوشده همان کالا (`exclude(status='cancelled')`).
+- **ترتیب پیش‌فرض (`ordering`):** بر اساس `["-created_at"]`.
+
+##### مدل `Payment`
+ثبت تراکنش‌های مالی شبیه‌سازی‌شده پیرامون هر قرارداد اجاره.
+
+| نام فیلد | نوع در جنگو | نوع در PostgreSQL | مشخصات و پیش‌فرض | توضیحات و قیود |
+|---|---|---|---|---|
+| `id` | `BigAutoField` | `bigint` | Primary Key, Auto-increment | شناسه داخلی تراکنش |
+| `rental` | `ForeignKey(Rental)` | `bigint` | `on_delete=CASCADE` | سفارش اجاره مربوطه (`related_name="payments"`) |
+| `kind` | `CharField(20)` | `varchar(20)` | Choices (`rent`, `deposit`, `deposit_refund`, `payout`) | نوع تراکنش مالی |
+| `amount` | `DecimalField(12, 0)` | `numeric(12, 0)` | اجباری | مبلغ تراکنش به ریال/تومان |
+| `status` | `CharField(20)` | `varchar(20)` | Choices (`success`, `failed`), `default='success'` | نتیجه پردازش تراکنش |
+| `receipt_no` | `CharField(64)` | `varchar(64)` | `unique=True` | شماره رسید یا پیگیری یکتای بانکی شبیه‌سازی‌شده |
+| `created_at` | `DateTimeField` | `timestamp with time zone` | `auto_now_add=True` | تاریخ و زمان انجام تراکنش |
+
+- **ترتیب پیش‌فرض (`ordering`):** بر اساس `["-created_at"]`.
+
+##### مدل `Dispute`
+پرونده‌های اختلاف و دعاوی حقوقی که در صورت بروز آسیب به کالا، تاخیر، یا تخلف تشکیل می‌شوند.
+
+| نام فیلد | نوع در جنگو | نوع در PostgreSQL | مشخصات و پیش‌فرض | توضیحات و قیود |
+|---|---|---|---|---|
+| `id` | `BigAutoField` | `bigint` | Primary Key, Auto-increment | شماره پرونده اختلاف |
+| `rental` | `ForeignKey(Rental)` | `bigint` | `on_delete=PROTECT` | سفارش اجاره مورد اختلاف (`related_name="disputes"`) |
+| `opened_by` | `ForeignKey(User)` | `bigint` | `on_delete=PROTECT` | کاربری که شکایت را مطرح کرده است (`related_name="opened_disputes"`) |
+| `reason` | `TextField` | `text` | اجباری | شرح کامل دلایل ادعا و مستندات اختلاف |
+| `status` | `CharField(20)` | `varchar(20)` | Choices (`open`, `resolved`), `default='open'` | وضعیت جاری رسیدگی به اختلاف |
+| `deposit_decision` | `CharField(20)` | `varchar(20)` | Choices (`return_to_renter`, `give_to_owner`, `split`), `blank=True` | رأی مدیر در خصوص ودیعه |
+| `resolution_note` | `TextField` | `text` | `blank=True` | شرح و ادله تصمیم نهایی مدیر |
+| `resolved_by` | `ForeignKey(User)` | `bigint` | `null=True`, `blank=True`, `on_delete=SET_NULL` | کاربری که داوری را انجام داده (مدیر با دسترسی `is_staff`) |
+| `resolved_at` | `DateTimeField` | `timestamp with time zone` | `null=True`, `blank=True` | زمان صدور رأی و مختومه شدن پرونده |
+| `created_at` | `DateTimeField` | `timestamp with time zone` | `auto_now_add=True` | تاریخ و زمان ثبت اختلاف |
+
+- **ترتیب پیش‌فرض (`ordering`):** بر اساس `["-created_at"]`.
+
+---
+
+#### ۴. اپلیکیشن `reviews`
+
+##### مدل `Review`
+امتیاز و دیدگاه کیفی دوطرفه میان موجر و مستأجر در پایان دوره اجاره.
+
+| نام فیلد | نوع در جنگو | نوع در PostgreSQL | مشخصات و پیش‌فرض | توضیحات و قیود |
+|---|---|---|---|---|
+| `id` | `BigAutoField` | `bigint` | Primary Key, Auto-increment | شناسه نظر |
+| `rental` | `ForeignKey(Rental)` | `bigint` | `on_delete=CASCADE` | سفارش اجاره مربوطه (`related_name="reviews"`) |
+| `reviewer` | `ForeignKey(User)` | `bigint` | `on_delete=CASCADE` | کاربر نظردهنده (`related_name="written_reviews"`) |
+| `reviewee` | `ForeignKey(User)` | `bigint` | `on_delete=CASCADE` | کاربر مورد ارزیابی قرارگرفته (`related_name="received_reviews"`) |
+| `reviewee_role` | `CharField(10)` | `varchar(10)` | Choices (`owner`, `renter`) | نقش کاربر ارزیابی‌شونده در آن معامله |
+| `rating` | `PositiveSmallIntegerField` | `smallint` | اجباری (بازه ۱ تا ۵) | امتیاز داده‌شده |
+| `comment` | `TextField` | `text` | `blank=True` | متن تشریحی دیدگاه کاربر |
+| `created_at` | `DateTimeField` | `timestamp with time zone` | `auto_now_add=True` | زمان ثبت نظر |
+
+- **قیود پایگاه داده (`constraints`):**
+  1. `review_rating_range_1_to_5`: قید شرطی `rating >= 1 AND rating <= 5`.
+  2. `unique_rental_reviewer_review`: قید یکتایی مرکب `UniqueConstraint(fields=["rental", "reviewer"])` جهت جلوگیری از ثبت بیش از یک نظر توسط هر طرف در یک سفارش.
+- **قواعد اعتبارسنجی در سطح متد `clean()`:**
+  1. امکان ثبت نظر تنها در وضعیت خاتمه‌یافته (`rental.status == 'completed'`) مجاز است.
+  2. جلوگیری از ثبت نظر برای خود (`reviewer != reviewee`).
+  3. اعتبارسنجی انطباق هویت: `reviewer` و `reviewee` باید حتماً موجر یا مستأجر همان سفارش اجاره باشند.
+  4. انطباق نقش: اگر نظردهنده موجر است، ارزیابی‌شونده باید مستأجر باشد با نقش `renter`؛ و اگر نظردهنده مستأجر است، ارزیابی‌شونده باید مالک باشد با نقش `owner`.
+- **ترتیب پیش‌فرض (`ordering`):** بر اساس `["-created_at"]`.
+
+---
+
+#### ۵. اپلیکیشن `chat`
+
+##### مدل `Conversation`
+رشته گفتگوی اختصاصی میان کاربر متقاضی اجاره و مالک کالا بر بستر یک آگهی معین.
+
+| نام فیلد | نوع در جنگو | نوع در PostgreSQL | مشخصات و پیش‌فرض | توضیحات و قیود |
+|---|---|---|---|---|
+| `id` | `BigAutoField` | `bigint` | Primary Key, Auto-increment | شناسه گفتگو |
+| `item` | `ForeignKey(Item)` | `bigint` | `on_delete=CASCADE` | کالای موضوع مکالمه (`related_name="conversations"`) |
+| `renter` | `ForeignKey(User)` | `bigint` | `on_delete=CASCADE` | کاربر متقاضی که گفتگو را آغاز کرده (`related_name="conversations"`) |
+| `created_at` | `DateTimeField` | `timestamp with time zone` | `auto_now_add=True` | زمان ایجاد رشته گفتگو |
+| `updated_at` | `DateTimeField` | `timestamp with time zone` | `auto_now=True` | آخرین زمان ارسال پیام یا به‌روزرسانی |
+
+- **پراپرتی پویا (`@property owner`):** مالک کالا مستقیماً از طریق `item.owner` بدون نیاز به افزونگی فیلد در دیتابیس در دسترس است.
+- **قیود پایگاه داده (`constraints`):**
+  1. `unique_item_renter_conversation`: قید یکتایی مرکب `(item, renter)` که تضمین می‌کند میان یک متقاضی و یک کالا تنها یک رشته گفتگو وجود دارد.
+- **قواعد اعتبارسنجی در سطح متد `clean()`:**
+  1. مالک کالا نمی‌تواند با خود رشته گفتگو ایجاد کند (`renter != item.owner`).
+- **ترتیب پیش‌فرض (`ordering`):** بر اساس `["-updated_at"]` (گفتگوهای دارای پیام جدیدتر در ابتدا).
+
+##### مدل `Message`
+پیام‌های متنی مبادله‌شده درون هر رشته گفتگو.
+
+| نام فیلد | نوع در جنگو | نوع در PostgreSQL | مشخصات و پیش‌فرض | توضیحات و قیود |
+|---|---|---|---|---|
+| `id` | `BigAutoField` | `bigint` | Primary Key, Auto-increment | شناسه پیام |
+| `conversation` | `ForeignKey(Conversation)` | `bigint` | `on_delete=CASCADE` | گفتگوی مربوطه (`related_name="messages"`) |
+| `sender` | `ForeignKey(User)` | `bigint` | `on_delete=CASCADE` | کاربر فرستنده پیام (`related_name="sent_messages"`) |
+| `body` | `TextField` | `text` | اجباری | متن پیام ارسالی |
+| `is_read` | `BooleanField` | `boolean` | `default=False` | پرچم نشان‌دهنده خوانده‌شدن پیام توسط طرف مقابل |
+| `created_at` | `DateTimeField` | `timestamp with time zone` | `auto_now_add=True` | زمان دقیق ارسال پیام |
+
+- **قواعد اعتبارسنجی در سطح متد `clean()`:**
+  1. فرستنده پیام (`sender`) باید الزاماً یا مالک کالا یا متقاضی همان رشته گفتگو باشد (`sender in (item.owner, renter)`).
+- **ترتیب پیش‌فرض (`ordering`):** بر اساس `["created_at"]` (نمایش به ترتیب توالی زمانی).
+
+---
+
+#### ۶. اپلیکیشن `core`
+اپلیکیشن `core` یک اپلیکیشن زیرساختی و اشتراکی است و مطابق تصمیم معماری پروژه (و سند `docs/DOMAIN.md`) **فاقد هرگونه مدل پایگاه داده‌ای** می‌باشد. این اپ وظیفه نگهداری کدهای مشترک زیر را بر عهده دارد:
+- قالب پایه وب‌سایت (`base.html`) با تایپوگرافی راست‌به‌چپ (RTL) و استایل‌های Tailwind.
+- میدل‌ورهای عمومی، از جمله میدل‌ور لاگین زمان پاسخ‌دهی و ریکوئست‌ها (`RequestLoggingMiddleware`).
+- کانتکست پروسسورهای سراسری جهت تزریق اطلاعات پایه به کلیه قالب‌ها.
+- کنترل‌کننده‌های صفحات خطای استاندارد سامانه (خطاهای ۴۰۴ و ۵۰۰).
+
+---
 
 ## ۴. Managerها و دلیل تعریف آن‌ها
 | Manager/QuerySet | متد | کار | چرا تعریف شد |
