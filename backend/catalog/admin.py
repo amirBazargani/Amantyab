@@ -15,6 +15,7 @@ class CategoryAdmin(admin.ModelAdmin):
     search_fields = ("name", "slug")
     list_filter = ("parent",)
     prepopulated_fields = {"slug": ("name",)}
+    readonly_fields = ("created_at",)
 
 
 @admin.register(Item)
@@ -49,6 +50,7 @@ class ItemAdmin(admin.ModelAdmin):
         "owner__username",
         "owner__email",
     )
+    readonly_fields = ("created_at", "updated_at")
     inlines = [ItemImageInline]
 
 
@@ -57,3 +59,4 @@ class ItemImageAdmin(admin.ModelAdmin):
     list_display = ("item", "is_primary", "order", "created_at")
     list_filter = ("is_primary",)
     search_fields = ("item__title",)
+    readonly_fields = ("created_at",)
