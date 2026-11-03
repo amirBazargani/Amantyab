@@ -51,14 +51,15 @@ Rule: do NOT write views/urls/templates/forms in this phase.
   - Commits: `feat(reviews): add Review model` · `feat(chat): add Conversation and Message models`
   - Done notes: Implemented Review model (rental, reviewer, reviewee, reviewee_role, rating with 1-5 CheckConstraint, duplicate prevention UniqueConstraint, clean() validating completed status and parties); implemented Conversation (item, renter, unique constraint, owner property, clean() self-chat check) and Message (conversation, sender, body, is_read, sender membership clean()); configured ReviewAdmin, ConversationAdmin with MessageInline, and MessageAdmin; created and applied 0001_initial migrations on PostgreSQL; verified constraints and clean validations in shell.
 
-- [ ] **P1-08 Phase 1 wrap-up**
+- [x] **P1-08 Phase 1 wrap-up**
   - Goal: everything registered in admin, docs match code, phase gate.
   - Files: all `admin.py` (list_display, list_filter, search_fields), `docs/DOMAIN.md` (fix any drift from code), `docs/REPORT.md` §3 (models table).
   - Then run `/phase-review`.
   - Commits: `feat: register models in admin` · `docs: fill models section of the report` · `chore: add database backup for phase 1`
+  - Done notes: Verified registration of all 10 models in Django admin; added readonly_fields for system timestamp audit fields in catalog admin; updated docs/DOMAIN.md to explicitly include updated_at on Conversation; filled docs/REPORT.md §3 with complete Mermaid ER diagram and comprehensive specification tables for all 10 models across 6 apps; generated and committed db_backup/phase-1.sql (51 KB PostgreSQL 16 dump); verified via manage.py check and automated admin registry inspection in shell.
 
 ### Phase 1 deliverables checklist
 - [ ] GitHub repo with all commits; link emailed to instructor the day before
-- [ ] 6 apps, models migrated on PostgreSQL
-- [ ] Process diagrams + descriptions
-- [ ] `db_backup/phase-1.sql` committed; tag `phase-1-done`
+- [x] 6 apps, models migrated on PostgreSQL
+- [x] Process diagrams + descriptions
+- [x] `db_backup/phase-1.sql` committed; tag `phase-1-done` (ready for tag in /phase-review)
