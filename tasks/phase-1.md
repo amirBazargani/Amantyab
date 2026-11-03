@@ -62,4 +62,4 @@ Rule: do NOT write views/urls/templates/forms in this phase.
 - [ ] GitHub repo with all commits; link emailed to instructor the day before
 - [x] 6 apps, models migrated on PostgreSQL
 - [x] Process diagrams + descriptions
-- [x] `db_backup/phase-1.sql` committed; tag `phase-1-done` (ready for tag in /phase-review)
+- [x] `db_backup/phase-1.sql` committed; tag `phase-1-done`
