@@ -1,0 +1,112 @@
+{% extends "base.html" %}
+
+{% block title %}ثبت‌نام در امانت‌یاب | امانت‌یاب{% endblock %}
+
+{% block content %}
+<div class="max-w-md mx-auto my-8">
+    <div class="bg-white p-8 rounded-2xl shadow-sm border border-gray-200">
+        <!-- Header -->
+        <div class="text-center mb-6">
+            <h1 class="text-2xl font-bold text-gray-900 mb-2">ثبت‌نام در امانت‌یاب</h1>
+            <p class="text-sm text-gray-600">هرچه نیاز داری در همسایگی توست</p>
+        </div>
+
+        {% if form.non_field_errors %}
+            <div class="mb-5 p-3 rounded-lg bg-red-50 border border-red-200 text-sm text-red-700 space-y-1">
+                {% for error in form.non_field_errors %}
+                    <p>{{ error }}</p>
+                {% endfor %}
+            </div>
+        {% endif %}
+
+        <form method="post" novalidate class="space-y-4">
+            {% csrf_token %}
+
+            <div>
+                <label for="{{ form.username.id_for_label }}" class="block text-sm font-medium text-gray-700 mb-1">
+                    {{ form.username.label }} <span class="text-red-500">*</span>
+                </label>
+                {{ form.username }}
+                {% if form.username.errors %}
+                    <p class="text-xs text-red-600 mt-1">{{ form.username.errors.0 }}</p>
+                {% else %}
+                    <p class="text-xs text-gray-500 mt-1">فقط حروف انگلیسی، اعداد و @/./+/-/_ مجاز است.</p>
+                {% endif %}
+            </div>
+
+            <div>
+                <label for="{{ form.email.id_for_label }}" class="block text-sm font-medium text-gray-700 mb-1">
+                    {{ form.email.label }} <span class="text-red-500">*</span>
+                </label>
+                {{ form.email }}
+                {% if form.email.errors %}
+                    <p class="text-xs text-red-600 mt-1">{{ form.email.errors.0 }}</p>
+                {% endif %}
+            </div>
+
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                    <label for="{{ form.first_name.id_for_label }}" class="block text-sm font-medium text-gray-700 mb-1">
+                        {{ form.first_name.label }}
+                    </label>
+                    {{ form.first_name }}
+                    {% if form.first_name.errors %}
+                        <p class="text-xs text-red-600 mt-1">{{ form.first_name.errors.0 }}</p>
+                    {% endif %}
+                </div>
+                <div>
+                    <label for="{{ form.last_name.id_for_label }}" class="block text-sm font-medium text-gray-700 mb-1">
+                        {{ form.last_name.label }}
+                    </label>
+                    {{ form.last_name }}
+                    {% if form.last_name.errors %}
+                        <p class="text-xs text-red-600 mt-1">{{ form.last_name.errors.0 }}</p>
+                    {% endif %}
+                </div>
+            </div>
+
+            <div>
+                <label for="{{ form.phone.id_for_label }}" class="block text-sm font-medium text-gray-700 mb-1">
+                    {{ form.phone.label }}
+                </label>
+                {{ form.phone }}
+                {% if form.phone.errors %}
+                    <p class="text-xs text-red-600 mt-1">{{ form.phone.errors.0 }}</p>
+                {% endif %}
+            </div>
+
+            <div>
+                <label for="{{ form.password1.id_for_label }}" class="block text-sm font-medium text-gray-700 mb-1">
+                    {{ form.password1.label }} <span class="text-red-500">*</span>
+                </label>
+                {{ form.password1 }}
+                {% if form.password1.errors %}
+                    <p class="text-xs text-red-600 mt-1">{{ form.password1.errors.0 }}</p>
+                {% endif %}
+            </div>
+
+            <div>
+                <label for="{{ form.password2.id_for_label }}" class="block text-sm font-medium text-gray-700 mb-1">
+                    {{ form.password2.label }} <span class="text-red-500">*</span>
+                </label>
+                {{ form.password2 }}
+                {% if form.password2.errors %}
+                    <p class="text-xs text-red-600 mt-1">{{ form.password2.errors.0 }}</p>
+                {% endif %}
+            </div>
+
+            <div class="pt-2">
+                <button type="submit" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-medium py-2.5 px-4 rounded-lg shadow-sm transition duration-150">
+                    ایجاد حساب کاربری
+                </button>
+            </div>
+        </form>
+
+        <!-- Footer link -->
+        <div class="mt-6 text-center text-sm text-gray-600 border-t border-gray-100 pt-4">
+            قبلاً حساب کاربری داشته‌اید؟
+            <a href="{% url 'accounts:login' %}" class="text-blue-600 hover:text-blue-700 font-medium mr-1">وارد شوید</a>
+        </div>
+    </div>
+</div>
+{% endblock %}

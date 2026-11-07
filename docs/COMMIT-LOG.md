@@ -158,6 +158,27 @@
 - مفهوم جنگو/پایتون که استفاده شد: الگوی طراحی Strategy برای پیامک، ماژول لودینگ پویای پایتون با `import_string`، رندر تمپلیت‌های متنی با `render_to_string`، سیستم ارسال ایمیل جنگو (`django.core.mail.send_mail`) و اصل Fault Tolerance (تحمل خطا).
 - اگر استاد بپرسد: اگر سرویس ارسال پیامک یا ایمیل قطع شود چه اتفاقی می‌افتد؟ پاسخ: تابع `notify` تمام استثناها را درون بلوک `try...except` مهار کرده و جزئیات ارور را در ستون `error` لاگ ذخیره می‌کند و وضعیت را روی `failed` قرار می‌دهد؛ در نتیجه استثنایی به ویو بازگردانده نمی‌شود و عملیات کاربر بدون وقفه تکمیل می‌گردد.
 
+---
+
+### 3bae69a — feat(accounts): add signup and login views
+- تسک: P2-02
+- چه چیزی تغییر کرد: پیاده‌سازی فرم ثبت‌نام (`SignUpForm` با ارث‌بری از `UserCreationForm`)، فرم ورود (`LoginForm` با ارث‌بری از `AuthenticationForm`) با برچسب‌ها و پیام‌های خطای فارسی و استایل Tailwind؛ ایجاد ویوهای ثبت‌نام، ورود و خروج کاربر در `accounts/views.py`؛ ایجاد قالب‌های `signup.html` و `login.html`؛ تنظیم روت‌های `accounts/urls.py` و الحاق آن به `config/urls.py`؛ تنظیم مقادیر `LOGIN_URL` و `LOGOUT_REDIRECT_URL` در `settings.py` و افزودن تست‌های خودکار احراز هویت در `accounts/tests.py`.
+- چرا لازم بود: ورود، ثبت‌نام و مدیریت نشست کاربر، پایه‌ای‌ترین قابلیت پلتفرم برای تعامل موجر و مستأجر در امانت کالا است.
+- فایل‌های مهم: `backend/accounts/forms.py`, `backend/accounts/views.py`, `backend/accounts/urls.py`, `backend/templates/accounts/signup.html`, `backend/templates/accounts/login.html`, `backend/config/urls.py`, `backend/config/settings.py`, `backend/accounts/tests.py`
+- مفهوم جنگو/پایتون که استفاده شد: کلاس‌های `UserCreationForm` و `AuthenticationForm`، توابع احراز هویت جنگو (`django.contrib.auth.login` و `logout`)، اعتبارسنجی فرم‌ها (`clean_email`)، ریدایرکت ایمن پس از ورود با `url_has_allowed_host_and_scheme` و پیام‌رسانی با `django.contrib.messages`.
+- اگر استاد بپرسد: چرا بعد از ثبت‌نام کاربر مستقیماً لاگین می‌شود؟ پاسخ: طبق الزامات UX و پذیرش تسک، با فراخوانی تابع `django.contrib.auth.login(request, user)` بلافاصله سشن لاگین ایجاد شده تا کاربر بدون نیاز به ورود مجدد اطلاعات مستقیماً وارد سیستم شود.
+
+---
+
+### 6054c85 — feat(accounts): add profile pages
+- تسک: P2-02
+- چه چیزی تغییر کرد: ایجاد فرم ویرایش پروفایل (`ProfileForm`) برای مدل کاربر؛ پیاده‌سازی ویوی ویرایش پروفایل شخصی تحت دکوراتور `login_required` در آدرس `/accounts/profile/` و ویوی مشاهده پروفایل عمومی در آدرس `/accounts/users/<username>/` همراه با فهرست کالاهای فعال؛ ساخت قالب‌های راست‌چین و ریسپانسیو `profile_edit.html` و `profile_detail.html`؛ تنظیم `LOGIN_REDIRECT_URL = "accounts:profile"` و تکمیل تست‌های جامع ذخیره پروفایل، هدایت کاربر مهمان و نمایش کالاهای فعال.
+- چرا لازم بود: کاربران پلتفرم همسایگی باید بتوانند اطلاعات تماس، شهر، محله و معرفی خود را مدیریت کنند و همچنین سوابق و لیست کالاهای فعال یکدیگر را در پروفایل عمومی مشاهده نمایند تا اعتماد متقابل شکل بگیرد.
+- فایل‌های مهم: `backend/accounts/forms.py`, `backend/accounts/views.py`, `backend/accounts/urls.py`, `backend/templates/accounts/profile_edit.html`, `backend/templates/accounts/profile_detail.html`, `backend/accounts/tests.py`
+- مفهوم جنگو/پایتون که استفاده شد: دکوراتور `@login_required`، کلاس `ModelForm` جنگو، متد `get_object_or_404`، بهینه‌سازی کوئری‌های ارتباطی معکوس با `prefetch_related("images")` و فیلتر روی روابط ORM (`user.items.filter(is_active=True)`).
+- اگر استاد بپرسد: دسترسی کاربران مهمان به صفحه ویرایش پروفایل چگونه محدود شده است؟ پاسخ: با قرار دادن دکوراتور `@login_required` روی ویوی `profile_edit_view`؛ اگر کاربر ناشناس به این آدرس مراجعه کند، جنگو درخواست را با کد 302 به آدرس `LOGIN_URL` هدایت کرده و پارامتر `next` را برای بازگشت پس از لاگین ضمیمه می‌کند.
+
+
 
 
 
