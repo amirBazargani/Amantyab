@@ -21,11 +21,11 @@ Each app has its own `urls.py` with `app_name`; root `config/urls.py` includes t
   - Commits: `feat(accounts): add signup and login views` · `feat(accounts): add profile pages`
   - Done notes: Implemented SignUpForm (UserCreationForm subclass), LoginForm (AuthenticationForm subclass with Persian errors) and ProfileForm (ModelForm with Tailwind styling); created signup, login, logout, profile edit and public profile views; routed URLs under accounts app and registered in config/urls.py; added Persian RTL templates for signup, login, profile edit and public profile showing active items; verified all 5 acceptance criteria with automated tests and shell Client.
 
-- [ ] **P2-02A Signup confirmation by email and SMS**
+- [x] **P2-02A Signup confirmation by email and SMS**
   - Files: `accounts/forms.py` (phone required + validator `^09\d{9}$` + normalisation in SignUpForm and ProfileForm), `accounts/views.py` (call `notify(user, "signup_confirmation")` after successful signup), templates (phone field).
   - Acceptance: signup without/invalid phone shows a Persian error; valid signup → logged in, console shows confirmation email AND SMS, 2 NotificationLog rows; a notification failure (simulate by raising in backend) does not stop signup.
   - Commit: `feat(accounts): require phone and send signup confirmation`
-  - Done notes:
+  - Done notes: Required Iranian mobile phone (09 + 9 digits) with normalisation (Persian/Arabic digits, prefixes) in SignUpForm and ProfileForm; connected notify() service in signup view to trigger email and SMS notifications; updated templates with required asterisk and format hint; verified with 12 automated unit tests and shell QA covering missing phone error, invalid format error, Persian digit normalization, dual NotificationLog rows creation, and simulated SMS backend failure fault tolerance.
 
 - [ ] **P2-03 catalog: browse + detail**
   - Files: `catalog/views.py` (item_list with GET filters q, category, city, max_price; item_detail), `urls.py`, templates, `partials/item_card.html`.
