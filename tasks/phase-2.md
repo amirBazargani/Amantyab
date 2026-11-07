@@ -8,12 +8,12 @@ Each app has its own `urls.py` with `app_name`; root `config/urls.py` includes t
   - Commit: `feat(core): add base layout, navbar and home page`
   - Done notes: Created base.html with RTL, Vazirmatn font CDN, and Tailwind CSS; created responsive navbar.html with auth state switches and mobile menu; added messages.html partial supporting Django message levels; added custom 404 and 500 error templates; implemented home view in core/views.py with core/home.html and registered core.urls into config/urls.py; verified via manage.py check (0 issues) and automated test suite verifying status 200, RTL, font, guest/auth/staff navbar states, alert messages, and 404 behavior with DEBUG=False.
 
-- [ ] **P2-01A Notification foundation (email + SMS)**
+- [x] **P2-01A Notification foundation (email + SMS)**
   - Files: `core/models.py` (NotificationLog per DOMAIN), `core/sms.py`, `core/notifications.py`, `core/admin.py`, `templates/notifications/<event>_subject.txt` and `<event>_body.txt` for the 3 events (Persian text, short), `config/settings.py` (EMAIL_BACKEND from env default console, DEFAULT_FROM_EMAIL, `SMS_BACKEND` default `console`), migration.
   - Goal: `notify(user, event, context=None, *, item=None, rental=None)` renders the event templates, sends email (Django `send_mail`) and SMS (backend from `get_sms_backend()`), writes one NotificationLog row per channel (`sent` / `failed` / `skipped` when user has no email or phone). Exceptions are caught, stored in `error`, never re-raised. Backends: `ConsoleBackend` (prints), `LocmemBackend` (list `sms.outbox`).
   - Acceptance: in `manage.py shell`, `notify(user, "signup_confirmation")` prints the email and SMS in the console and creates 2 log rows; a user without phone gets an sms row with status `skipped`; a backend that raises produces a `failed` row and no exception; rows visible in admin.
   - Commits: `feat(core): add NotificationLog model` · `feat(core): add SMS backends and notify service`
-  - Done notes:
+  - Done notes: Defined NotificationLog model in core/models.py with index (event, created_at) and SET_NULL FKs; generated and applied migration core.0001_initial; registered model in admin with readonly fields and filters; added email/SMS settings in config/settings.py; implemented swappable SMS backends in core/sms.py (ConsoleBackend, LocmemBackend, get_sms_backend); created Persian event templates in templates/notifications/; implemented notify() service with dual-channel sending, sent/skipped/failed statuses, and safe exception handling; verified via manage.py check and automated shell tests covering all 4 acceptance criteria.
 
 - [ ] **P2-02 accounts: auth + profile**
   - Files: `accounts/forms.py` (SignUpForm, ProfileForm), `views.py` (signup, login, logout, profile edit, public profile), `urls.py`, `templates/accounts/*.html`.
