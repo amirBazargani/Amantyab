@@ -1,0 +1,12 @@
+# Code rules (keep it simple — the human must explain it)
+- Prefer Django built-ins: ModelForm, generic/class-based views only when simpler than functions; otherwise function views.
+- Small functions, clear names, 1-line docstring for every model, form, view and manager method.
+- Business rules live in model methods / QuerySet / `rentals/services.py`, NOT in templates and NOT copy-pasted in views.
+- Money: DecimalField (max_digits=12, decimal_places=0, Toman, integer amounts). Never float.
+- Datetimes: timezone-aware, USE_TZ=True, TIME_ZONE='Asia/Tehran'.
+- Settings via environment (`python-dotenv`): SECRET_KEY, DEBUG, DB_*, EMAIL_*. No secrets in git.
+- Templates: one `base.html`, partials in `templates/partials/`, Persian text, `dir="rtl"`, Tailwind classes only (no custom CSS unless unavoidable).
+- Permissions without extras: login_required + simple ownership checks (`if obj.owner != request.user: raise PermissionDenied`). Admin pages: `user.is_staff`.
+- Never leave `print()` in code; use logging after P3-04.
+- From Phase 4 on, every behaviour change adds or updates a test. Before that, add manual QA steps to the task's "Done" notes.
+- If a requirement is unclear: choose the simplest interpretation, record it in docs/DECISIONS.md, continue.
