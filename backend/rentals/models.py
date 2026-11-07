@@ -2,6 +2,7 @@ from decimal import Decimal
 
 from django.conf import settings
 from django.core.exceptions import ValidationError
+from django.core.validators import MaxValueValidator, MinValueValidator
 from django.db import models
 from django.utils.translation import gettext_lazy as _
 
@@ -82,6 +83,34 @@ class Rental(models.Model):
         null=True,
         blank=True,
     )
+    delivery_address = models.TextField(_("delivery address"), blank=True)
+    delivery_latitude = models.DecimalField(
+        _("delivery latitude"),
+        max_digits=9,
+        decimal_places=6,
+        null=True,
+        blank=True,
+        validators=[
+            MinValueValidator(Decimal("-90.0")),
+            MaxValueValidator(Decimal("90.0")),
+        ],
+    )
+    delivery_longitude = models.DecimalField(
+        _("delivery longitude"),
+        max_digits=9,
+        decimal_places=6,
+        null=True,
+        blank=True,
+        validators=[
+            MinValueValidator(Decimal("-180.0")),
+            MaxValueValidator(Decimal("180.0")),
+        ],
+    )
+    reminder_sent_at = models.DateTimeField(
+        _("reminder sent at"),
+        null=True,
+        blank=True,
+    )
     created_at = models.DateTimeField(_("created at"), auto_now_add=True)
     updated_at = models.DateTimeField(_("updated at"), auto_now=True)
 
@@ -94,6 +123,13 @@ class Rental(models.Model):
                 condition=models.Q(end_at__gt=models.F("start_at")),
                 name="rental_end_after_start",
             ),
+            models.CheckConstraint(
+                condition=(
+                    (models.Q(delivery_latitude__isnull=True) & models.Q(delivery_longitude__isnull=True))
+                    | (models.Q(delivery_latitude__isnull=False) & models.Q(delivery_longitude__isnull=False))
+                ),
+                name="rental_delivery_lat_lng_both_or_neither",
+            ),
         ]
 
     def __str__(self):
@@ -103,6 +139,15 @@ class Rental(models.Model):
 
     def clean(self):
         super().clean()
+
+        if (self.delivery_latitude is None and self.delivery_longitude is not None) or (
+            self.delivery_latitude is not None and self.delivery_longitude is None
+        ):
+            raise ValidationError(
+                _(
+                    "Delivery latitude and longitude must either both be set or both be empty."
+                )
+            )
 
         if self.start_at and self.end_at and self.end_at <= self.start_at:
             raise ValidationError(
