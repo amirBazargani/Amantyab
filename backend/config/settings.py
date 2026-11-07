@@ -146,7 +146,7 @@ SMS_BACKEND = os.getenv("SMS_BACKEND", "console")
 
 # Authentication settings
 LOGIN_URL = "accounts:login"
-LOGIN_REDIRECT_URL = "core:home"
+LOGIN_REDIRECT_URL = "accounts:profile"
 LOGOUT_REDIRECT_URL = "core:home"
 
 

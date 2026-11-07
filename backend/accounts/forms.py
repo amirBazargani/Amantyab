@@ -123,4 +123,44 @@ class LoginForm(AuthenticationForm):
             )
 
 
-
+class ProfileForm(forms.ModelForm):
+    class Meta:
+        model = User
+        fields = [
+            "first_name",
+            "last_name",
+            "phone",
+            "city",
+            "neighborhood",
+            "bio",
+        ]
+        labels = {
+            "first_name": "نام",
+            "last_name": "نام خانوادگی",
+            "phone": "شماره تماس",
+            "city": "شهر",
+            "neighborhood": "محله",
+            "bio": "درباره من",
+        }
+        widgets = {
+            "first_name": forms.TextInput(attrs={"class": INPUT_CSS_CLASS}),
+            "last_name": forms.TextInput(attrs={"class": INPUT_CSS_CLASS}),
+            "phone": forms.TextInput(attrs={"class": INPUT_CSS_CLASS, "dir": "ltr"}),
+            "city": forms.TextInput(
+                attrs={"class": INPUT_CSS_CLASS, "placeholder": "مثال: تهران"}
+            ),
+            "neighborhood": forms.TextInput(
+                attrs={"class": INPUT_CSS_CLASS, "placeholder": "مثال: ونک"}
+            ),
+            "bio": forms.Textarea(
+                attrs={
+                    "class": (
+                        "w-full px-3 py-2 border border-gray-300 rounded-lg "
+                        "focus:outline-none focus:ring-2 focus:ring-blue-500 "
+                        "focus:border-blue-500 text-sm"
+                    ),
+                    "rows": 4,
+                    "placeholder": "چند کلمه درباره خودتان بنویسید...",
+                }
+            ),
+        }
