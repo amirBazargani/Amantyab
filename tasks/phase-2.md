@@ -27,10 +27,11 @@ Each app has its own `urls.py` with `app_name`; root `config/urls.py` includes t
   - Commit: `feat(accounts): require phone and send signup confirmation`
   - Done notes: Required Iranian mobile phone (09 + 9 digits) with normalisation (Persian/Arabic digits, prefixes) in SignUpForm and ProfileForm; connected notify() service in signup view to trigger email and SMS notifications; updated templates with required asterisk and format hint; verified with 12 automated unit tests and shell QA covering missing phone error, invalid format error, Persian digit normalization, dual NotificationLog rows creation, and simulated SMS backend failure fault tolerance.
 
-- [ ] **P2-03 catalog: browse + detail**
+- [x] **P2-03 catalog: browse + detail**
   - Files: `catalog/views.py` (item_list with GET filters q, category, city, max_price; item_detail), `urls.py`, templates, `partials/item_card.html`.
   - Acceptance: filters combine correctly; inactive items are hidden; detail shows images, prices, deposit, owner, delivery options.
   - Commit: `feat(catalog): add item list with filters and detail page`
+  - Done notes: Implemented item_list view with multi-parameter GET filters (q, category by slug/id, city, and max_price), item_detail view with access control hiding inactive items from general public (404) while allowing owner/staff access; created partials/item_card.html, catalog/item_list.html with search/filters/chips, and catalog/item_detail.html with image gallery, specs, deposit explanation, owner profile link and delivery badges; registered routes in catalog/urls.py and mounted in config/urls.py; verified with 8 comprehensive automated unit tests in catalog/tests.py and shell client verification covering all 3 acceptance criteria.
 
 - [ ] **P2-03A Geo fields migration (instructor change)**
   - Files: `catalog/models.py`, `rentals/models.py`, both `admin.py`, NEW migrations only (never edit old migrations).
