@@ -1,0 +1,221 @@
+{% extends "base.html" %}
+
+{% block title %}{{ item.title }} | امانت‌یاب{% endblock %}
+
+{% block content %}
+<div class="max-w-6xl mx-auto my-6 space-y-6">
+    <!-- Breadcrumb -->
+    <nav class="flex items-center text-xs md:text-sm text-gray-500 space-x-2 space-x-reverse">
+        <a href="{% url 'core:home' %}" class="hover:text-blue-600 transition">خانه</a>
+        <span>/</span>
+        <a href="{% url 'catalog:item_list' %}" class="hover:text-blue-600 transition">کالاها</a>
+        <span>/</span>
+        <a href="{% url 'catalog:item_list' %}?category={{ item.category.slug }}" class="hover:text-blue-600 transition">{{ item.category.name }}</a>
+        <span>/</span>
+        <span class="text-gray-800 font-medium truncate max-w-xs">{{ item.title }}</span>
+    </nav>
+
+    <!-- Inactive Notice for Owner/Staff -->
+    {% if not item.is_active %}
+        <div class="bg-amber-50 border border-amber-200 text-amber-900 px-4 py-3 rounded-2xl flex items-center space-x-2 space-x-reverse text-sm">
+            <svg class="w-5 h-5 text-amber-600 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path>
+            </svg>
+            <span>این کالا در وضعیت <strong>غیرفعال</strong> قرار دارد و برای سایر کاربران در سایت نمایش داده نمی‌شود.</span>
+        </div>
+    {% endif %}
+
+    <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
+        <!-- Main Column (Images & Details) -->
+        <div class="lg:col-span-2 space-y-6">
+            <!-- Gallery Section -->
+            <div class="bg-white rounded-3xl border border-gray-200 p-4 shadow-sm overflow-hidden">
+                <div class="h-80 sm:h-96 w-full rounded-2xl bg-gray-100 overflow-hidden flex items-center justify-center relative">
+                    {% if primary_image and primary_image.image %}
+                        <img id="main-item-image" src="{{ primary_image.image.url }}" alt="{{ item.title }}" class="w-full h-full object-cover">
+                    {% else %}
+                        <div class="flex flex-col items-center justify-center text-gray-400">
+                            <svg class="w-16 h-16" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"></path>
+                            </svg>
+                            <span class="text-sm mt-2">تصویری برای این کالا ثبت نشده است</span>
+                        </div>
+                    {% endif %}
+                </div>
+
+                <!-- Thumbnails -->
+                {% if images|length > 1 %}
+                    <div class="flex gap-3 mt-4 overflow-x-auto pb-2">
+                        {% for img in images %}
+                            <button type="button" onclick="document.getElementById('main-item-image').src='{{ img.image.url }}'"
+                                    class="w-20 h-20 rounded-xl overflow-hidden border-2 border-transparent hover:border-blue-500 focus:border-blue-500 flex-shrink-0 transition bg-gray-50">
+                                <img src="{{ img.image.url }}" alt="{{ item.title }}" class="w-full h-full object-cover">
+                            </button>
+                        {% endfor %}
+                    </div>
+                {% endif %}
+            </div>
+
+            <!-- Item Specifications & Description -->
+            <div class="bg-white rounded-3xl border border-gray-200 p-6 sm:p-8 shadow-sm space-y-6">
+                <!-- Title & Meta -->
+                <div class="border-b border-gray-100 pb-5">
+                    <div class="flex flex-wrap items-center gap-2 mb-2">
+                        <span class="bg-blue-50 text-blue-700 text-xs font-semibold px-2.5 py-1 rounded-lg border border-blue-100">
+                            {{ item.category.name }}
+                        </span>
+                        <span class="bg-gray-100 text-gray-700 text-xs font-semibold px-2.5 py-1 rounded-lg">
+                            وضعیت: {{ item.get_condition_display }}
+                        </span>
+                        {% if item.brand %}
+                            <span class="bg-gray-100 text-gray-700 text-xs font-semibold px-2.5 py-1 rounded-lg">
+                                برند: {{ item.brand }}
+                            </span>
+                        {% endif %}
+                    </div>
+
+                    <h1 class="text-2xl sm:text-3xl font-black text-gray-900 mt-2">
+                        {{ item.title }}
+                    </h1>
+
+                    <div class="flex items-center text-xs sm:text-sm text-gray-500 mt-3 space-x-3 space-x-reverse">
+                        <div class="flex items-center space-x-1 space-x-reverse">
+                            <svg class="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"></path>
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"></path>
+                            </svg>
+                            <span>{{ item.city }}{% if item.neighborhood %}، محله {{ item.neighborhood }}{% endif %}</span>
+                        </div>
+                        <span>•</span>
+                        <div>ثبت در {{ item.created_at|date:"Y/m/d" }}</div>
+                    </div>
+                </div>
+
+                <!-- Description -->
+                <div>
+                    <h2 class="text-lg font-bold text-gray-900 mb-3">توضیحات و مشخصات کالا</h2>
+                    <div class="text-gray-700 text-sm leading-relaxed whitespace-pre-line bg-gray-50/70 p-5 rounded-2xl border border-gray-100">
+                        {{ item.description }}
+                    </div>
+                </div>
+
+                <!-- Delivery Options Summary -->
+                <div>
+                    <h2 class="text-lg font-bold text-gray-900 mb-3">نحوه تحویل کالا</h2>
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                        <div class="p-4 rounded-2xl border {% if item.allow_pickup %}border-emerald-200 bg-emerald-50/50 text-emerald-900{% else %}border-gray-200 bg-gray-50 text-gray-400{% endif %} flex items-center space-x-3 space-x-reverse">
+                            <div class="w-10 h-10 rounded-xl {% if item.allow_pickup %}bg-emerald-100 text-emerald-700{% else %}bg-gray-200 text-gray-500{% endif %} flex items-center justify-center flex-shrink-0">
+                                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z"></path>
+                                </svg>
+                            </div>
+                            <div>
+                                <div class="font-bold text-sm">تحویل حضوری</div>
+                                <div class="text-xs {% if item.allow_pickup %}text-emerald-700{% else %}text-gray-400{% endif %}">
+                                    {% if item.allow_pickup %}امکان دریافت حضوری از مالک فراهم است{% else %}غیرفعال{% endif %}
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="p-4 rounded-2xl border {% if item.allow_courier %}border-blue-200 bg-blue-50/50 text-blue-900{% else %}border-gray-200 bg-gray-50 text-gray-400{% endif %} flex items-center space-x-3 space-x-reverse">
+                            <div class="w-10 h-10 rounded-xl {% if item.allow_courier %}bg-blue-100 text-blue-700{% else %}bg-gray-200 text-gray-500{% endif %} flex items-center justify-center flex-shrink-0">
+                                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16V6a1 1 0 00-1-1H4a1 1 0 00-1 1v10a1 1 0 001 1h1m8-1a1 1 0 01-1 1H9m4-1V8a1 1 0 011-1h2.586a1 1 0 01.707.293l3.414 3.414a1 1 0 01.293.707V16a1 1 0 01-1 1h-1m-6-1a1 1 0 001 1h1M5 17a2 2 0 104 0m-4 0a2 2 0 114 0m6 0a2 2 0 104 0m-4 0a2 2 0 114 0"></path>
+                                </svg>
+                            </div>
+                            <div>
+                                <div class="font-bold text-sm">ارسال با پیک</div>
+                                <div class="text-xs {% if item.allow_courier %}text-blue-700{% else %}text-gray-400{% endif %}">
+                                    {% if item.allow_courier %}امکان ارسال به آدرس شما با پیک موتوری{% else %}غیرفعال{% endif %}
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Sidebar (Pricing & Action & Owner) -->
+        <div class="space-y-6">
+            <!-- Pricing Card -->
+            <div class="bg-white rounded-3xl border border-gray-200 p-6 shadow-sm space-y-5 sticky top-20">
+                <div class="border-b border-gray-100 pb-4">
+                    <span class="text-xs text-gray-500 block mb-1">تعرفه اجاره:</span>
+                    <div class="flex items-baseline space-x-1 space-x-reverse">
+                        <span class="text-3xl font-black text-gray-900">{{ item.daily_price|floatformat:0 }}</span>
+                        <span class="text-sm text-gray-500 font-medium">تومان / روزانه</span>
+                    </div>
+
+                    {% if item.hourly_price %}
+                        <div class="mt-2 text-xs text-gray-600 bg-gray-50 py-1.5 px-3 rounded-lg flex items-center justify-between border border-gray-100">
+                            <span>تعرفه ساعتی (کمتر از ۲۴ ساعت):</span>
+                            <span class="font-bold text-gray-900">{{ item.hourly_price|floatformat:0 }} تومان / ساعت</span>
+                        </div>
+                    {% endif %}
+                </div>
+
+                <!-- Deposit -->
+                <div class="flex items-center justify-between text-sm py-2 px-3 bg-blue-50/70 border border-blue-100 rounded-xl">
+                    <div class="flex items-center space-x-1.5 space-x-reverse text-blue-800">
+                        <svg class="w-4 h-4 text-blue-600 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"></path>
+                        </svg>
+                        <span class="font-semibold">مبلغ ودیعه تضمین:</span>
+                    </div>
+                    <div class="font-bold text-blue-900">
+                        {% if item.deposit_amount > 0 %}
+                            {{ item.deposit_amount|floatformat:0 }} تومان
+                        {% else %}
+                            بدون ودیعه
+                        {% endif %}
+                    </div>
+                </div>
+                <p class="text-[11px] text-gray-400 leading-normal">
+                    * ودیعه به عنوان امانت نزد پلتفرم نگهداری می‌شود و بلافاصله پس از بازگرداندن سالم کالا به حسابتان برمی‌گردد.
+                </p>
+
+                <!-- Actions -->
+                <div class="pt-2 space-y-2">
+                    {% if is_owner %}
+                        <div class="p-3 bg-amber-50 border border-amber-200 rounded-xl text-center text-xs text-amber-800 font-medium">
+                            شما مالک این کالا هستید
+                        </div>
+                    {% else %}
+                        {% if request.user.is_authenticated %}
+                            <a href="#" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3.5 px-4 rounded-xl shadow-md transition text-center block text-sm">
+                                درخواست امانت کالا
+                            </a>
+                        {% else %}
+                            <a href="{% url 'accounts:login' %}?next={{ request.path }}" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3.5 px-4 rounded-xl shadow-md transition text-center block text-sm">
+                                ورود برای درخواست امانت
+                            </a>
+                        {% endif %}
+                    {% endif %}
+                </div>
+
+                <!-- Owner Profile Box -->
+                <div class="pt-5 border-t border-gray-100">
+                    <span class="text-xs text-gray-400 font-semibold block mb-3">مالک کالا:</span>
+                    <div class="flex items-center space-x-3 space-x-reverse">
+                        <div class="w-12 h-12 rounded-full bg-indigo-100 text-indigo-700 font-bold flex items-center justify-center text-lg flex-shrink-0">
+                            {{ item.owner.first_name|first|default:item.owner.username|first|upper }}
+                        </div>
+                        <div class="flex-grow min-w-0">
+                            <a href="{% url 'accounts:public_profile' item.owner.username %}" class="font-bold text-gray-900 hover:text-blue-600 transition text-sm block truncate">
+                                {{ item.owner.get_full_name|default:item.owner.username }}
+                            </a>
+                            <div class="text-xs text-gray-500 mt-0.5">
+                                عضویت از {{ item.owner.date_joined|date:"Y/m/d" }}
+                            </div>
+                        </div>
+                    </div>
+
+                    <a href="{% url 'accounts:public_profile' item.owner.username %}" class="mt-4 block text-center text-xs text-blue-600 hover:text-blue-700 bg-blue-50/50 hover:bg-blue-50 py-2 rounded-xl transition font-medium">
+                        مشاهده سایر وسایل این همسایه
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
