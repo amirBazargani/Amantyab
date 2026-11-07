@@ -33,12 +33,12 @@ Each app has its own `urls.py` with `app_name`; root `config/urls.py` includes t
   - Commit: `feat(catalog): add item list with filters and detail page`
   - Done notes: Implemented item_list view with multi-parameter GET filters (q, category by slug/id, city, and max_price), item_detail view with access control hiding inactive items from general public (404) while allowing owner/staff access; created partials/item_card.html, catalog/item_list.html with search/filters/chips, and catalog/item_detail.html with image gallery, specs, deposit explanation, owner profile link and delivery badges; registered routes in catalog/urls.py and mounted in config/urls.py; verified with 8 comprehensive automated unit tests in catalog/tests.py and shell client verification covering all 3 acceptance criteria.
 
-- [ ] **P2-03A Geo fields migration (instructor change)**
+- [x] **P2-03A Geo fields migration (instructor change)**
   - Files: `catalog/models.py`, `rentals/models.py`, both `admin.py`, NEW migrations only (never edit old migrations).
   - Goal: add the fields from DOMAIN.md: Item latitude/longitude/address_text; Rental delivery_address/delivery_latitude/delivery_longitude/reminder_sent_at; constraints and validators.
   - Acceptance: `makemigrations` creates one new migration per app; `migrate` OK on the existing database with existing rows; shell: lat without lng raises IntegrityError; latitude 120 fails `full_clean()`.
   - Commit: `feat(catalog): add pickup location fields` · `feat(rentals): add delivery location and reminder fields`
-  - Done notes:
+  - Done notes: Added latitude (Decimal 9,6), longitude (Decimal 9,6), and address_text to Item model with validators and CheckConstraint item_lat_lng_both_or_neither; added delivery_address, delivery_latitude, delivery_longitude, and reminder_sent_at to Rental model with validators and CheckConstraint rental_delivery_lat_lng_both_or_neither; organized admin fieldsets for both ItemAdmin and RentalAdmin; created new migrations catalog.0002 and rentals.0002 and applied them successfully to existing database; verified via manage.py check (0 issues), 26 unit tests, and shell client QA confirming IntegrityError on partial coordinates and ValidationError on out-of-range latitude.
 
 - [ ] **P2-04 catalog: owner management**
   - Files: `catalog/forms.py` (ItemForm, ItemImageFormSet), views (my_items, item_create, item_edit, item_toggle_active, item_delete), templates.
