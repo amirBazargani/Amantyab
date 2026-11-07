@@ -42,6 +42,54 @@ class RentalAdmin(admin.ModelAdmin):
         "renter__username",
         "renter__email",
         "item__owner__username",
+        "delivery_address",
+    )
+    fieldsets = (
+        (
+            None,
+            {
+                "fields": (
+                    "item",
+                    "renter",
+                    ("start_at", "end_at"),
+                    "status",
+                    "tracking_code",
+                )
+            },
+        ),
+        (
+            _("Financials"),
+            {
+                "fields": (
+                    "rent_amount",
+                    "deposit_amount",
+                    "commission_rate",
+                    "commission_amount",
+                    "owner_payout",
+                )
+            },
+        ),
+        (
+            _("Delivery & Reminder"),
+            {
+                "fields": (
+                    "delivery_method",
+                    "delivery_address",
+                    ("delivery_latitude", "delivery_longitude"),
+                    "reminder_sent_at",
+                )
+            },
+        ),
+        (
+            _("Timestamps"),
+            {
+                "fields": (
+                    "created_at",
+                    "updated_at",
+                ),
+                "classes": ("collapse",),
+            },
+        ),
     )
     readonly_fields = ("created_at", "updated_at")
     inlines = [PaymentInline, DisputeInline]

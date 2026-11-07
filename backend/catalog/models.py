@@ -1,4 +1,8 @@
+from decimal import Decimal
+
 from django.conf import settings
+from django.core.exceptions import ValidationError
+from django.core.validators import MaxValueValidator, MinValueValidator
 from django.db import models
 from django.utils.translation import gettext_lazy as _
 
@@ -75,6 +79,29 @@ class Item(models.Model):
     allow_pickup = models.BooleanField(_("allow pickup"), default=True)
     allow_courier = models.BooleanField(_("allow courier"), default=False)
     is_active = models.BooleanField(_("is active"), default=True)
+    latitude = models.DecimalField(
+        _("latitude"),
+        max_digits=9,
+        decimal_places=6,
+        null=True,
+        blank=True,
+        validators=[
+            MinValueValidator(Decimal("-90.0")),
+            MaxValueValidator(Decimal("90.0")),
+        ],
+    )
+    longitude = models.DecimalField(
+        _("longitude"),
+        max_digits=9,
+        decimal_places=6,
+        null=True,
+        blank=True,
+        validators=[
+            MinValueValidator(Decimal("-180.0")),
+            MaxValueValidator(Decimal("180.0")),
+        ],
+    )
+    address_text = models.CharField(_("address text"), max_length=255, blank=True)
     created_at = models.DateTimeField(_("created at"), auto_now_add=True)
     updated_at = models.DateTimeField(_("updated at"), auto_now=True)
 
@@ -91,6 +118,13 @@ class Item(models.Model):
                 condition=models.Q(allow_pickup=True) | models.Q(allow_courier=True),
                 name="item_at_least_one_delivery_method",
             ),
+            models.CheckConstraint(
+                condition=(
+                    (models.Q(latitude__isnull=True) & models.Q(longitude__isnull=True))
+                    | (models.Q(latitude__isnull=False) & models.Q(longitude__isnull=False))
+                ),
+                name="item_lat_lng_both_or_neither",
+            ),
         ]
         indexes = [
             models.Index(fields=["city", "is_active"], name="item_city_active_idx"),
@@ -98,6 +132,15 @@ class Item(models.Model):
 
     def __str__(self):
         return self.title
+
+    def clean(self):
+        super().clean()
+        if (self.latitude is None and self.longitude is not None) or (
+            self.latitude is not None and self.longitude is None
+        ):
+            raise ValidationError(
+                _("Latitude and longitude must either both be set or both be empty.")
+            )
 
 
 class ItemImage(models.Model):
