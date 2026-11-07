@@ -1,0 +1,106 @@
+{% url 'core:home' as home_url %}
+{% url 'accounts:login' as login_url %}
+{% url 'accounts:signup' as signup_url %}
+{% url 'accounts:logout' as logout_url %}
+{% url 'accounts:profile' as profile_url %}
+{% url 'catalog:item_list' as item_list_url %}
+{% url 'catalog:item_create' as item_create_url %}
+
+<nav class="bg-white border-b border-gray-200 sticky top-0 z-50">
+    <div class="container mx-auto px-4">
+        <div class="flex items-center justify-between h-16">
+            <!-- Brand & Main Navigation -->
+            <div class="flex items-center space-x-6 space-x-reverse">
+                <a href="{{ home_url|default:'/' }}" class="flex items-center space-x-2 space-x-reverse text-blue-600 font-bold text-xl">
+                    <svg class="w-7 h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"></path>
+                    </svg>
+                    <span>امانت‌یاب</span>
+                </a>
+
+                <div class="hidden md:flex items-center space-x-4 space-x-reverse text-sm font-medium text-gray-700">
+                    <a href="{{ home_url|default:'/' }}" class="hover:text-blue-600 transition px-2 py-1">صفحه اصلی</a>
+                    <a href="{{ item_list_url|default:'/catalog/' }}" class="hover:text-blue-600 transition px-2 py-1">کالاها</a>
+                    {% if request.user.is_authenticated %}
+                        <a href="{{ item_create_url|default:'/catalog/new/' }}" class="hover:text-blue-600 transition px-2 py-1">ثبت کالا</a>
+                    {% endif %}
+                </div>
+            </div>
+
+            <!-- User Auth & CTA -->
+            <div class="hidden md:flex items-center space-x-3 space-x-reverse">
+                {% if request.user.is_authenticated %}
+                    {% if request.user.is_staff %}
+                        <a href="{% url 'admin:index' %}" class="text-xs bg-purple-50 text-purple-700 hover:bg-purple-100 font-medium px-3 py-1.5 rounded-md border border-purple-200 transition">
+                            پنل مدیریت
+                        </a>
+                    {% endif %}
+
+                    <a href="{{ profile_url|default:'/accounts/profile/' }}" class="flex items-center space-x-1.5 space-x-reverse text-sm text-gray-700 hover:text-blue-600 font-medium px-3 py-1.5 rounded-lg hover:bg-gray-100 transition">
+                        <svg class="w-4 h-4 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"></path>
+                        </svg>
+                        <span>{{ request.user.first_name|default:request.user.phone|default:request.user.email }}</span>
+                    </a>
+
+                    <form action="{{ logout_url|default:'/accounts/logout/' }}" method="post" class="inline">
+                        {% csrf_token %}
+                        <button type="submit" class="text-sm text-red-600 hover:text-red-700 hover:bg-red-50 px-3 py-1.5 rounded-lg transition">
+                            خروج
+                        </button>
+                    </form>
+                {% else %}
+                    <a href="{{ login_url|default:'/accounts/login/' }}" class="text-sm font-medium text-gray-700 hover:text-blue-600 px-3 py-1.5 rounded-lg transition">
+                        ورود
+                    </a>
+                    <a href="{{ signup_url|default:'/accounts/signup/' }}" class="text-sm font-medium bg-blue-600 text-white hover:bg-blue-700 px-4 py-2 rounded-lg shadow-sm transition">
+                        ثبت‌نام
+                    </a>
+                {% endif %}
+            </div>
+
+            <!-- Mobile menu button -->
+            <div class="flex md:hidden items-center">
+                <button type="button" id="mobile-menu-btn" class="text-gray-600 hover:text-gray-900 focus:outline-none p-2 rounded-md">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"></path>
+                    </svg>
+                </button>
+            </div>
+        </div>
+
+        <!-- Mobile Navigation Menu -->
+        <div id="mobile-menu" class="hidden md:hidden border-t border-gray-100 py-3 space-y-2">
+            <a href="{{ home_url|default:'/' }}" class="block px-3 py-2 rounded-md text-base font-medium text-gray-700 hover:bg-gray-100">صفحه اصلی</a>
+            <a href="{{ item_list_url|default:'/catalog/' }}" class="block px-3 py-2 rounded-md text-base font-medium text-gray-700 hover:bg-gray-100">کالاها</a>
+            {% if request.user.is_authenticated %}
+                <a href="{{ item_create_url|default:'/catalog/new/' }}" class="block px-3 py-2 rounded-md text-base font-medium text-gray-700 hover:bg-gray-100">ثبت کالا</a>
+                <a href="{{ profile_url|default:'/accounts/profile/' }}" class="block px-3 py-2 rounded-md text-base font-medium text-gray-700 hover:bg-gray-100">پروفایل کاربری ({{ request.user.first_name|default:request.user.phone }})</a>
+                {% if request.user.is_staff %}
+                    <a href="{% url 'admin:index' %}" class="block px-3 py-2 rounded-md text-base font-medium text-purple-700 hover:bg-purple-50">پنل مدیریت</a>
+                {% endif %}
+                <form action="{{ logout_url|default:'/accounts/logout/' }}" method="post" class="pt-2">
+                    {% csrf_token %}
+                    <button type="submit" class="w-full text-right px-3 py-2 text-base font-medium text-red-600 hover:bg-red-50 rounded-md">خروج</button>
+                </form>
+            {% else %}
+                <div class="pt-2 flex flex-col space-y-2">
+                    <a href="{{ login_url|default:'/accounts/login/' }}" class="block text-center px-4 py-2 text-base font-medium text-gray-700 border border-gray-300 rounded-md hover:bg-gray-50">ورود</a>
+                    <a href="{{ signup_url|default:'/accounts/signup/' }}" class="block text-center px-4 py-2 text-base font-medium bg-blue-600 text-white rounded-md hover:bg-blue-700">ثبت‌نام</a>
+                </div>
+            {% endif %}
+        </div>
+    </div>
+</nav>
+
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        const btn = document.getElementById('mobile-menu-btn');
+        const menu = document.getElementById('mobile-menu');
+        if (btn && menu) {
+            btn.addEventListener('click', function() {
+                menu.classList.toggle('hidden');
+            });
+        }
+    });
+</script>

@@ -1,0 +1,97 @@
+{% extends "base.html" %}
+
+{% block title %}امانت‌یاب | هرچه نیاز داری در همسایگی توست{% endblock %}
+
+{% block content %}
+<!-- Hero Section -->
+<section class="bg-gradient-to-br from-blue-50 to-indigo-50 border border-blue-100 rounded-3xl p-8 md:p-14 text-center my-6 shadow-sm">
+    <div class="max-w-3xl mx-auto space-y-6">
+        <span class="inline-block bg-blue-100 text-blue-800 text-xs md:text-sm font-semibold px-4 py-1.5 rounded-full">
+            پلتفرم اجاره وسایل و ابزار در همسایگی
+        </span>
+        <h1 class="text-3xl md:text-5xl font-black text-gray-900 tracking-tight leading-tight">
+            هر چه نیاز داری، در <span class="text-blue-600">همسایگی</span> توست!
+        </h1>
+        <p class="text-base md:text-lg text-gray-600 leading-relaxed max-w-2xl mx-auto">
+            به جای خرید ابزارها و وسایلی که سالی یک‌بار استفاده می‌کنید، آن‌ها را با قیمتی مناسب از همسایگان خود امانت بگیرید یا از وسایل کم‌استفاده‌تان درآمد کسب کنید.
+        </p>
+        
+        <!-- Search Bar -->
+        {% url 'catalog:item_list' as item_list_url %}
+        <form action="{{ item_list_url|default:'/catalog/' }}" method="get" class="max-w-xl mx-auto flex flex-col sm:flex-row gap-2 pt-2">
+            <div class="relative flex-grow">
+                <input type="text" name="q" placeholder="چه وسیله‌ای نیاز دارید؟ (مثلاً: دریل، چادر مسافرتی، نردبان...)"
+                       class="w-full pl-4 pr-11 py-3.5 bg-white border border-gray-300 rounded-2xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent shadow-sm">
+                <div class="absolute inset-y-0 right-0 pr-3.5 flex items-center pointer-events-none text-gray-400">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path>
+                    </svg>
+                </div>
+            </div>
+            <button type="submit" class="bg-blue-600 hover:bg-blue-700 text-white font-medium px-7 py-3.5 rounded-2xl shadow-sm transition whitespace-nowrap text-sm">
+                جستجو
+            </button>
+        </form>
+    </div>
+</section>
+
+<!-- How it works -->
+<section class="py-12">
+    <div class="text-center mb-10">
+        <h2 class="text-2xl font-bold text-gray-900 mb-2">امانت‌یاب چگونه کار می‌کند؟</h2>
+        <p class="text-gray-500 text-sm">چهار مرحله ساده برای امانت گرفتن یا اجاره دادن وسایل</p>
+    </div>
+
+    <div class="grid grid-cols-1 md:grid-cols-4 gap-6">
+        <!-- Step 1 -->
+        <div class="bg-white p-6 rounded-2xl border border-gray-200 shadow-sm text-center">
+            <div class="w-12 h-12 bg-blue-100 text-blue-600 rounded-xl flex items-center justify-center mx-auto mb-4 font-bold text-lg">
+                ۱
+            </div>
+            <h3 class="font-bold text-gray-800 mb-2">جستجو و انتخاب</h3>
+            <p class="text-gray-500 text-xs leading-relaxed">کالای مورد نظرتان را در شهر یا محله‌تان جستجو و مشخصات آن را بررسی کنید.</p>
+        </div>
+
+        <!-- Step 2 -->
+        <div class="bg-white p-6 rounded-2xl border border-gray-200 shadow-sm text-center">
+            <div class="w-12 h-12 bg-green-100 text-green-600 rounded-xl flex items-center justify-center mx-auto mb-4 font-bold text-lg">
+                ۲
+            </div>
+            <h3 class="font-bold text-gray-800 mb-2">درخواست و ودیعه امن</h3>
+            <p class="text-gray-500 text-xs leading-relaxed">بازه زمانی اجاره را انتخاب کنید و هزینه اجاره و ودیعه را امن پرداخت نمایید.</p>
+        </div>
+
+        <!-- Step 3 -->
+        <div class="bg-white p-6 rounded-2xl border border-gray-200 shadow-sm text-center">
+            <div class="w-12 h-12 bg-amber-100 text-amber-600 rounded-xl flex items-center justify-center mx-auto mb-4 font-bold text-lg">
+                ۳
+            </div>
+            <h3 class="font-bold text-gray-800 mb-2">تحویل کالا</h3>
+            <p class="text-gray-500 text-xs leading-relaxed">کالا را حضوری از مالک تحویل بگیرید یا درخواست ارسال با پیک ثبت کنید.</p>
+        </div>
+
+        <!-- Step 4 -->
+        <div class="bg-white p-6 rounded-2xl border border-gray-200 shadow-sm text-center">
+            <div class="w-12 h-12 bg-purple-100 text-purple-600 rounded-xl flex items-center justify-center mx-auto mb-4 font-bold text-lg">
+                ۴
+            </div>
+            <h3 class="font-bold text-gray-800 mb-2">بازگشت و آزادسازی ودیعه</h3>
+            <p class="text-gray-500 text-xs leading-relaxed">پس از پایان کار و تحویل سالم کالا، ودیعه بلافاصله به حسابتان بازمی‌گردد.</p>
+        </div>
+    </div>
+</section>
+
+<!-- Call to Action Banner -->
+{% url 'catalog:item_create' as item_create_url %}
+<section class="bg-blue-600 rounded-3xl p-8 md:p-10 text-white my-8 flex flex-col md:flex-row items-center justify-between shadow-md">
+    <div class="space-y-2 text-center md:text-right mb-6 md:mb-0">
+        <h2 class="text-2xl font-bold">وسایل بدون استفاده‌تان را به درآمد تبدیل کنید!</h2>
+        <p class="text-blue-100 text-sm max-w-xl">
+            دستگاه‌ها و ابزارهایی که در کمد یا انباری خاک می‌خورند را در امانت‌یاب ثبت کنید و با دریافت تضمین ودیعه کسب درآمد کنید.
+        </p>
+    </div>
+    <a href="{{ item_create_url|default:'/catalog/new/' }}" class="bg-white text-blue-600 hover:bg-blue-50 font-bold px-6 py-3 rounded-xl shadow transition text-sm whitespace-nowrap">
+        ثبت کالای جدید برای اجاره
+    </a>
+</section>
+{% endblock %}
