@@ -255,3 +255,74 @@ class CatalogViewsTestCase(TestCase):
         self.client.force_login(self.staff_user)
         staff_res = self.client.get(reverse("catalog:item_detail", args=[self.inactive_item.pk]))
         self.assertEqual(staff_res.status_code, 200)
+
+
+class ItemGeoFieldsTestCase(TestCase):
+    def setUp(self):
+        self.owner = User.objects.create_user(
+            username="geouser",
+            email="geo@example.com",
+            password="StrongPassword123!",
+            phone="09124444444",
+        )
+        self.category = Category.objects.create(name="ابزار", slug="tools-geo")
+
+    def test_lat_without_lng_raises_integrity_error(self):
+        """Item with latitude set but longitude None violates DB constraint."""
+        from django.db import IntegrityError
+
+        with self.assertRaises(IntegrityError):
+            Item.objects.create(
+                owner=self.owner,
+                category=self.category,
+                title="Invalid Lat Only",
+                description="desc",
+                condition=Item.Condition.NEW,
+                daily_price=Decimal("50000"),
+                city="تهران",
+                allow_pickup=True,
+                latitude=Decimal("35.6892"),
+                longitude=None,
+            )
+
+    def test_latitude_120_fails_full_clean(self):
+        """Item with latitude > 90 fails full_clean() validation."""
+        from django.core.exceptions import ValidationError
+
+        item = Item(
+            owner=self.owner,
+            category=self.category,
+            title="Invalid Lat Value",
+            description="desc",
+            condition=Item.Condition.NEW,
+            daily_price=Decimal("50000"),
+            city="تهران",
+            allow_pickup=True,
+            latitude=Decimal("120.0"),
+            longitude=Decimal("51.3890"),
+        )
+        with self.assertRaises(ValidationError) as ctx:
+            item.full_clean()
+        self.assertIn("latitude", ctx.exception.message_dict)
+
+    def test_valid_coordinates_and_address_text_persist(self):
+        """Item with valid coordinates and address text saves and cleans properly."""
+        item = Item.objects.create(
+            owner=self.owner,
+            category=self.category,
+            title="Valid Coordinates Item",
+            description="desc",
+            condition=Item.Condition.GOOD,
+            daily_price=Decimal("50000"),
+            city="تهران",
+            neighborhood="ونک",
+            allow_pickup=True,
+            address_text="میدان ونک، خیابان ملاصدرا",
+            latitude=Decimal("35.757500"),
+            longitude=Decimal("51.410000"),
+        )
+        item.full_clean()
+        self.assertEqual(item.address_text, "میدان ونک، خیابان ملاصدرا")
+        self.assertEqual(item.latitude, Decimal("35.757500"))
+        self.assertEqual(item.longitude, Decimal("51.410000"))
+

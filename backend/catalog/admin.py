@@ -47,8 +47,58 @@ class ItemAdmin(admin.ModelAdmin):
         "brand",
         "city",
         "neighborhood",
+        "address_text",
         "owner__username",
         "owner__email",
+    )
+    fieldsets = (
+        (
+            None,
+            {
+                "fields": (
+                    "owner",
+                    "category",
+                    "title",
+                    "description",
+                    "brand",
+                    "condition",
+                    "is_active",
+                )
+            },
+        ),
+        (
+            _("Pricing"),
+            {
+                "fields": (
+                    "daily_price",
+                    "hourly_price",
+                    "deposit_amount",
+                )
+            },
+        ),
+        (
+            _("Location & Delivery"),
+            {
+                "fields": (
+                    "city",
+                    "neighborhood",
+                    "allow_pickup",
+                    "allow_courier",
+                    "address_text",
+                    ("latitude", "longitude"),
+                )
+            },
+        ),
+        (
+            _("Timestamps"),
+            {
+                "fields": (
+                    "created_at",
+                    "updated_at",
+                ),
+                "classes": ("collapse",),
+            },
+        ),
     )
     readonly_fields = ("created_at", "updated_at")
     inlines = [ItemImageInline]
