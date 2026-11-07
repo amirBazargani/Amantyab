@@ -15,10 +15,11 @@ Each app has its own `urls.py` with `app_name`; root `config/urls.py` includes t
   - Commits: `feat(core): add NotificationLog model` · `feat(core): add SMS backends and notify service`
   - Done notes: Defined NotificationLog model in core/models.py with index (event, created_at) and SET_NULL FKs; generated and applied migration core.0001_initial; registered model in admin with readonly fields and filters; added email/SMS settings in config/settings.py; implemented swappable SMS backends in core/sms.py (ConsoleBackend, LocmemBackend, get_sms_backend); created Persian event templates in templates/notifications/; implemented notify() service with dual-channel sending, sent/skipped/failed statuses, and safe exception handling; verified via manage.py check and automated shell tests covering all 4 acceptance criteria.
 
-- [ ] **P2-02 accounts: auth + profile**
+- [x] **P2-02 accounts: auth + profile**
   - Files: `accounts/forms.py` (SignUpForm, ProfileForm), `views.py` (signup, login, logout, profile edit, public profile), `urls.py`, `templates/accounts/*.html`.
   - Acceptance: sign up → logged in; wrong password shows error; profile edit saves; public profile shows name, city and items; anonymous user is redirected from profile edit to login.
   - Commits: `feat(accounts): add signup and login views` · `feat(accounts): add profile pages`
+  - Done notes: Implemented SignUpForm (UserCreationForm subclass), LoginForm (AuthenticationForm subclass with Persian errors) and ProfileForm (ModelForm with Tailwind styling); created signup, login, logout, profile edit and public profile views; routed URLs under accounts app and registered in config/urls.py; added Persian RTL templates for signup, login, profile edit and public profile showing active items; verified all 5 acceptance criteria with automated tests and shell Client.
 
 - [ ] **P2-02A Signup confirmation by email and SMS**
   - Files: `accounts/forms.py` (phone required + validator `^09\d{9}$` + normalisation in SignUpForm and ProfileForm), `accounts/views.py` (call `notify(user, "signup_confirmation")` after successful signup), templates (phone field).
