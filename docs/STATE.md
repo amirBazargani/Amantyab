@@ -1,9 +1,9 @@
 # STATE (the agent updates this at /finish-task; the human can edit too)
 - current_phase: 2
-- current_task: P2-01
-- last_completed: Phase 1 (P1-08)
+- current_task: P2-01A
+- last_completed: P2-01
 - repo_url: https://github.com/amirBazargani/Amantyab
 - deadlines: P1 = 2026-11-04 (DELIVERED) | P2 = ? | P3 = ? | P4 = ?
 - instructor email: nedasoltanih@gmail.com (repo link must be mailed the day BEFORE phase 1 delivery)
 - open questions: D-02 (React SPA allowed?)
-- notes for next session: Phase 1 closed with tag phase-1-done. Push commits and tags to GitHub; send repo link to instructor. Next: Phase 2 (P2-01). UPDATE-01 applied: new tasks P2-01A, P2-02A, P2-03A, P2-04A, P2-04B, P2-05A, P3-01A, P4-06A (optional).
+- notes for next session: P2-01 (Base layout) completed and verified. Next task: P2-01A Notification foundation (email + SMS) for core notifications model and SMS backends.
