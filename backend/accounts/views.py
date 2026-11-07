@@ -5,6 +5,7 @@ from django.shortcuts import get_object_or_404, redirect, render
 from django.utils.http import url_has_allowed_host_and_scheme
 
 from accounts.forms import LoginForm, ProfileForm, SignUpForm
+from core.notifications import notify
 
 User = get_user_model()
 
@@ -18,6 +19,7 @@ def signup_view(request):
         if form.is_valid():
             user = form.save()
             login(request, user)
+            notify(user, "signup_confirmation")
             messages.success(
                 request,
                 f"خوش آمدید {user.first_name or user.username}! حساب کاربری شما با موفقیت ایجاد شد.",

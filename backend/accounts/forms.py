@@ -1,6 +1,9 @@
+import re
+
 from django import forms
 from django.contrib.auth import get_user_model
 from django.contrib.auth.forms import AuthenticationForm, UserCreationForm
+from django.core.validators import RegexValidator
 
 User = get_user_model()
 
@@ -8,6 +11,30 @@ INPUT_CSS_CLASS = (
     "w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none "
     "focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm"
 )
+
+IRANIAN_PHONE_REGEX = r"^09\d{9}$"
+phone_regex_validator = RegexValidator(
+    regex=IRANIAN_PHONE_REGEX,
+    message="شماره موبایل نامعتبر است. فرمت صحیح: ۰۹۱۲۳۴۵۶۷۸۹ (۱۱ رقم با ۰۹)",
+)
+
+
+def normalize_iranian_phone(phone_str):
+    """Normalize Persian/Arabic digits, strip spaces/dashes, and standardize prefixes."""
+    if not phone_str:
+        return ""
+    persian_arabic_digits = "۰۱۲۳۴۵۶۷۸۹٠١٢٣٤٥٦٧٨٩"
+    english_digits = "01234567890123456789"
+    trans_table = str.maketrans(persian_arabic_digits, english_digits)
+    cleaned = str(phone_str).translate(trans_table)
+    cleaned = re.sub(r"[\s\-\(\)\.]+", "", cleaned)
+    if cleaned.startswith("+98"):
+        cleaned = "0" + cleaned[3:]
+    elif cleaned.startswith("0098"):
+        cleaned = "0" + cleaned[4:]
+    elif cleaned.startswith("98") and len(cleaned) == 12:
+        cleaned = "0" + cleaned[2:]
+    return cleaned
 
 
 class SignUpForm(UserCreationForm):
@@ -38,7 +65,10 @@ class SignUpForm(UserCreationForm):
     )
     phone = forms.CharField(
         label="شماره تماس",
-        required=False,
+        required=True,
+        error_messages={
+            "required": "وارد کردن شماره موبایل الزامی است.",
+        },
         widget=forms.TextInput(
             attrs={
                 "class": INPUT_CSS_CLASS,
@@ -88,6 +118,17 @@ class SignUpForm(UserCreationForm):
                 }
             )
 
+    def clean_phone(self):
+        raw_phone = self.cleaned_data.get("phone", "")
+        phone = normalize_iranian_phone(raw_phone)
+        if not phone:
+            raise forms.ValidationError("وارد کردن شماره موبایل الزامی است.")
+        if not re.match(IRANIAN_PHONE_REGEX, phone):
+            raise forms.ValidationError(
+                "شماره موبایل نامعتبر است. فرمت صحیح: ۰۹۱۲۳۴۵۶۷۸۹ (۱۱ رقم با ۰۹)"
+            )
+        return phone
+
     def clean_email(self):
         email = self.cleaned_data.get("email")
         if email and User.objects.filter(email__iexact=email).exists():
@@ -124,6 +165,21 @@ class LoginForm(AuthenticationForm):
 
 
 class ProfileForm(forms.ModelForm):
+    phone = forms.CharField(
+        label="شماره تماس",
+        required=True,
+        error_messages={
+            "required": "وارد کردن شماره موبایل الزامی است.",
+        },
+        widget=forms.TextInput(
+            attrs={
+                "class": INPUT_CSS_CLASS,
+                "placeholder": "۰۹۱۲۳۴۵۶۷۸۹",
+                "dir": "ltr",
+            }
+        ),
+    )
+
     class Meta:
         model = User
         fields = [
@@ -145,7 +201,6 @@ class ProfileForm(forms.ModelForm):
         widgets = {
             "first_name": forms.TextInput(attrs={"class": INPUT_CSS_CLASS}),
             "last_name": forms.TextInput(attrs={"class": INPUT_CSS_CLASS}),
-            "phone": forms.TextInput(attrs={"class": INPUT_CSS_CLASS, "dir": "ltr"}),
             "city": forms.TextInput(
                 attrs={"class": INPUT_CSS_CLASS, "placeholder": "مثال: تهران"}
             ),
@@ -164,3 +219,14 @@ class ProfileForm(forms.ModelForm):
                 }
             ),
         }
+
+    def clean_phone(self):
+        raw_phone = self.cleaned_data.get("phone", "")
+        phone = normalize_iranian_phone(raw_phone)
+        if not phone:
+            raise forms.ValidationError("وارد کردن شماره موبایل الزامی است.")
+        if not re.match(IRANIAN_PHONE_REGEX, phone):
+            raise forms.ValidationError(
+                "شماره موبایل نامعتبر است. فرمت صحیح: ۰۹۱۲۳۴۵۶۷۸۹ (۱۱ رقم با ۰۹)"
+            )
+        return phone
