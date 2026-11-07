@@ -2,10 +2,11 @@
 Rule: server-rendered Django templates (Tailwind CDN, Persian RTL). No React yet. No managers yet (plain ORM in views is OK; Phase 3 refactors it into managers).
 Each app has its own `urls.py` with `app_name`; root `config/urls.py` includes them.
 
-- [ ] **P2-01 Base layout**
+- [x] **P2-01 Base layout**
   - Files: `backend/templates/base.html`, `partials/navbar.html`, `partials/messages.html`, `404.html`, `500.html`, `core/views.py` (home), `core/urls.py`.
   - Acceptance: home page renders RTL with Vazirmatn font, navbar shows login/signup or username/logout, Django messages visible, custom 404 works with DEBUG=False.
   - Commit: `feat(core): add base layout, navbar and home page`
+  - Done notes: Created base.html with RTL, Vazirmatn font CDN, and Tailwind CSS; created responsive navbar.html with auth state switches and mobile menu; added messages.html partial supporting Django message levels; added custom 404 and 500 error templates; implemented home view in core/views.py with core/home.html and registered core.urls into config/urls.py; verified via manage.py check (0 issues) and automated test suite verifying status 200, RTL, font, guest/auth/staff navbar states, alert messages, and 404 behavior with DEBUG=False.
 
 - [ ] **P2-01A Notification foundation (email + SMS)**
   - Files: `core/models.py` (NotificationLog per DOMAIN), `core/sms.py`, `core/notifications.py`, `core/admin.py`, `templates/notifications/<event>_subject.txt` and `<event>_body.txt` for the 3 events (Persian text, short), `config/settings.py` (EMAIL_BACKEND from env default console, DEFAULT_FROM_EMAIL, `SMS_BACKEND` default `console`), migration.
