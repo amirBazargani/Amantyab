@@ -3,13 +3,13 @@
 
 - [ ] **P4-01 Email verification**
   - Files: `accounts/tokens.py` (use `django.core.signing.TimestampSigner` or `default_token_generator`), views (verify_email, resend_verification), templates (`emails/verify.txt`, `verify_sent.html`), settings (EMAIL_BACKEND from env: console in dev, SMTP in prod), `accounts/models.py` (no change; uses is_email_verified).
-  - Goal: after signup, a link valid for 24h; unverified users can log in and browse but cannot create items, request rentals, or send messages (decorator `verified_required`).
+  - Goal: after signup, a link valid for 24h; unverified users can log in and browse but cannot create items, request rentals, or send messages (decorator `verified_required`). The signup confirmation email from P2-02A gets the verification link added (ONE email, not two); the SMS stays a plain confirmation.
   - Acceptance: console shows the email; link verifies; expired/tampered link shows a friendly error; resend works; logs record verification events.
   - Commits: `feat(accounts): add email verification tokens and views` · `feat(core): restrict actions to verified users`
 
 - [ ] **P4-02 Tests**
   - Files: `*/tests/` packages (`test_models.py`, `test_forms.py`, `test_views.py`, `test_services.py`), `core/tests/test_cookies.py`.
-  - Must cover: model constraints; pricing (hour/day); overlap detection; every legal and illegal rental transition; queryset methods; permission checks (403/redirect); review rules; dispute resolution; email verification; session remember-me; cookie tamper.
+  - Must cover: model constraints; pricing (hour/day); overlap detection; every legal and illegal rental transition; queryset methods; permission checks (403/redirect); review rules; dispute resolution; email verification; session remember-me; cookie tamper; notifications (locmem mail outbox + `sms.outbox`: sent, skipped without phone, failed backend does not break the request), phone validation, the reminder command (window, status filter, idempotency), geo validation (both-or-none, ranges, courier requires address).
   - Acceptance: `python manage.py test` green; at least ~40 tests; a short "how to run tests" in README.
   - Commits (one per app): `test(accounts): ...`, `test(catalog): ...`, `test(rentals): ...`, `test(reviews): ...`, `test(chat): ...`, `test(core): ...`
 
@@ -19,7 +19,7 @@
   - Commits: `refactor: extract template partials` · `perf: fix N+1 queries and add query-count tests` · `perf(catalog): resize uploaded images`
 
 - [ ] **P4-04 Complete the report**
-  - Files: `docs/REPORT.md` fully filled: §1 diagram image, §2 process texts, §3 models+relations, §4 managers+reasons, §5 views table (generate the list from `urls.py` files), §6 extras. Export `docs/REPORT.pdf` if a tool is available (else the human exports from the md).
+  - Files: `docs/REPORT.md` fully filled: §1 diagram image, §2 process texts, §3 models+relations, §4 managers+reasons, §5 views table (generate the list from `urls.py` files), §6 extras. Export `docs/REPORT.pdf` if a tool is available (else the human exports from the md). REPORT gets a short "نوتیفیکیشن‌ها و نقشه" part (events, channels, backends, Leaflet/OSM).
   - Acceptance: every PDF-required item (process diagram, web/app processes, models and relations, managers and why, views) is present and matches the code.
   - Commit: `docs: complete final project report`
 
@@ -33,9 +33,16 @@
   - Goal: run the checklist of each earlier phase again; fix what is missing or drifted; fresh-database run (`drop db → migrate → seed_demo → runserver`) must work; update docs.
   - Commit(s): `fix: ...` per gap.
 
+- [ ] **P4-06A (optional) Real SMS gateway adapter**
+  - Do ONLY if the human has a Kavenegar account/API key. Files: `core/sms.py` (KavenegarBackend using `urllib.request`, no new package), `.env.example` (`SMS_BACKEND`, `KAVENEGAR_API_KEY`, `KAVENEGAR_SENDER`).
+  - Acceptance: with `SMS_BACKEND=kavenegar` a signup sends a real SMS; with the default `console` nothing changes; the key never appears in logs or git. Check the request format against the provider's current docs before coding.
+  - Commit: `feat(core): add optional Kavenegar SMS backend`
+  - Done notes:
+
 - [ ] **P4-07 Final delivery**
   - `/phase-review`; final `db_backup/phase-4.sql`; README (install, env, run, seed, tests); tag `phase-4-done` and `v1.0`; `docs/DEFENSE.md` complete; a 10-minute demo script in `docs/DEMO.md`.
 
 ### Phase 4 deliverables checklist
 - [ ] email verification · tests green · optimised templates · full report · earlier phases complete
+- [ ] notifications tested; reminder command tested
 - [ ] `db_backup/phase-4.sql`; tag `phase-4-done`

@@ -25,4 +25,4 @@ See `.agent/rules/` (project, git, code). Short version:
 - Never push to `main` directly. Never force-push. Never rewrite published history.
 - Never mark a task done without showing real output of `/verify`.
 - Never add a package that is not in docs/DECISIONS.md without asking.
-- Never invent features (no bonus items: no SMS, maps, permissions-based extras, pagination, fetch/AJAX beyond Phase 4 P4-04).
+- Never invent features. The only extras allowed are those in docs/DECISIONS.md D-06: email + SMS notifications, map, React islands (P4-05). Still excluded: SMS-based account verification, Permission extras, Pagination, per-role dashboards other than admin, any other bonus item.

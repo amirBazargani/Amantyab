@@ -7,25 +7,66 @@ Each app has its own `urls.py` with `app_name`; root `config/urls.py` includes t
   - Acceptance: home page renders RTL with Vazirmatn font, navbar shows login/signup or username/logout, Django messages visible, custom 404 works with DEBUG=False.
   - Commit: `feat(core): add base layout, navbar and home page`
 
+- [ ] **P2-01A Notification foundation (email + SMS)**
+  - Files: `core/models.py` (NotificationLog per DOMAIN), `core/sms.py`, `core/notifications.py`, `core/admin.py`, `templates/notifications/<event>_subject.txt` and `<event>_body.txt` for the 3 events (Persian text, short), `config/settings.py` (EMAIL_BACKEND from env default console, DEFAULT_FROM_EMAIL, `SMS_BACKEND` default `console`), migration.
+  - Goal: `notify(user, event, context=None, *, item=None, rental=None)` renders the event templates, sends email (Django `send_mail`) and SMS (backend from `get_sms_backend()`), writes one NotificationLog row per channel (`sent` / `failed` / `skipped` when user has no email or phone). Exceptions are caught, stored in `error`, never re-raised. Backends: `ConsoleBackend` (prints), `LocmemBackend` (list `sms.outbox`).
+  - Acceptance: in `manage.py shell`, `notify(user, "signup_confirmation")` prints the email and SMS in the console and creates 2 log rows; a user without phone gets an sms row with status `skipped`; a backend that raises produces a `failed` row and no exception; rows visible in admin.
+  - Commits: `feat(core): add NotificationLog model` · `feat(core): add SMS backends and notify service`
+  - Done notes:
+
 - [ ] **P2-02 accounts: auth + profile**
   - Files: `accounts/forms.py` (SignUpForm, ProfileForm), `views.py` (signup, login, logout, profile edit, public profile), `urls.py`, `templates/accounts/*.html`.
   - Acceptance: sign up → logged in; wrong password shows error; profile edit saves; public profile shows name, city and items; anonymous user is redirected from profile edit to login.
   - Commits: `feat(accounts): add signup and login views` · `feat(accounts): add profile pages`
+
+- [ ] **P2-02A Signup confirmation by email and SMS**
+  - Files: `accounts/forms.py` (phone required + validator `^09\d{9}$` + normalisation in SignUpForm and ProfileForm), `accounts/views.py` (call `notify(user, "signup_confirmation")` after successful signup), templates (phone field).
+  - Acceptance: signup without/invalid phone shows a Persian error; valid signup → logged in, console shows confirmation email AND SMS, 2 NotificationLog rows; a notification failure (simulate by raising in backend) does not stop signup.
+  - Commit: `feat(accounts): require phone and send signup confirmation`
+  - Done notes:
 
 - [ ] **P2-03 catalog: browse + detail**
   - Files: `catalog/views.py` (item_list with GET filters q, category, city, max_price; item_detail), `urls.py`, templates, `partials/item_card.html`.
   - Acceptance: filters combine correctly; inactive items are hidden; detail shows images, prices, deposit, owner, delivery options.
   - Commit: `feat(catalog): add item list with filters and detail page`
 
+- [ ] **P2-03A Geo fields migration (instructor change)**
+  - Files: `catalog/models.py`, `rentals/models.py`, both `admin.py`, NEW migrations only (never edit old migrations).
+  - Goal: add the fields from DOMAIN.md: Item latitude/longitude/address_text; Rental delivery_address/delivery_latitude/delivery_longitude/reminder_sent_at; constraints and validators.
+  - Acceptance: `makemigrations` creates one new migration per app; `migrate` OK on the existing database with existing rows; shell: lat without lng raises IntegrityError; latitude 120 fails `full_clean()`.
+  - Commit: `feat(catalog): add pickup location fields` · `feat(rentals): add delivery location and reminder fields`
+  - Done notes:
+
 - [ ] **P2-04 catalog: owner management**
   - Files: `catalog/forms.py` (ItemForm, ItemImageFormSet), views (my_items, item_create, item_edit, item_toggle_active, item_delete), templates.
   - Acceptance: only the owner can edit/delete (others get 403); image upload works; item with rentals cannot be deleted (show message, suggest pause).
   - Commits: `feat(catalog): add ItemForm and image formset` · `feat(catalog): add owner item management views`
 
+- [ ] **P2-04A Map: choose and show item location**
+  - Files: `templates/partials/map_picker.html`, `templates/partials/map_view.html`, `catalog/forms.py` (ItemForm gets latitude, longitude as hidden fields + address_text), item create/edit templates, item detail template.
+  - Goal: Leaflet + OSM (CDN). Picker: click or drag a marker, writes the two hidden inputs, default centre = Tehran. Viewer: read-only map with one marker + the address text. ItemForm `clean()`: both coordinates or none, ranges valid.
+  - Acceptance: owner sets a point and it persists; item detail shows the map; item without coordinates shows only the address text and no map; invalid coordinates (tampered POST) are rejected by the form.
+  - Commits: `feat(core): add Leaflet map picker and viewer partials` · `feat(catalog): add pickup location to item form and detail`
+  - Done notes:
+
+- [ ] **P2-04B Item registration confirmation by email and SMS**
+  - Files: `catalog/views.py` (item_create).
+  - Goal: after a NEW item is saved call `notify(owner, "item_registered", {"title": item.title}, item=item)`; editing an item does not notify.
+  - Acceptance: creating an item prints email + SMS with the title and creates 2 NotificationLog rows linked to the item; edit sends nothing.
+  - Commit: `feat(catalog): notify owner when an item is registered`
+  - Done notes:
+
 - [ ] **P2-05 rentals: request, price, payment, receipt**
   - Files: `rentals/services.py` (calculate_price, has_overlap, create_rental, simulate_payment), `forms.py` (RentalRequestForm with clean() for dates/overlap/own item), views (rental_request, rental_pay, rental_receipt), templates.
   - Acceptance: price matches the rule in DOMAIN.md (test hour and day cases by hand); overlap rejected; owner cannot rent own item; payment creates Payment rows (rent, deposit), status → confirmed, tracking_code set.
   - Commits: `feat(rentals): add pricing and overlap services` · `feat(rentals): add rental request form and views` · `feat(rentals): add simulated payment and receipt`
+
+- [ ] **P2-05A Map for the handover location**
+  - Files: `rentals/forms.py` (RentalRequestForm: if delivery_method = courier then delivery_address is required; optional pin via hidden delivery_latitude/longitude), rental request template (map_picker, shown only for courier), receipt and rental_detail templates (map_view).
+  - Goal: for `pickup` rentals show the ITEM's pickup point; for `courier` rentals show the renter's delivery point; same partials as P2-04A.
+  - Acceptance: courier without address is rejected; receipt shows the right map for each method; no map when no coordinates exist.
+  - Commit: `feat(rentals): show handover location on map`
+  - Done notes:
 
 - [ ] **P2-06 rentals: lifecycle**
   - Files: `rentals/services.py` (transition functions with allowed-transition table), views (my_rentals, owner_rentals, rental_detail, handover, mark_returned, confirm_return, cancel), templates.
@@ -44,7 +85,7 @@ Each app has its own `urls.py` with `app_name`; root `config/urls.py` includes t
 
 - [ ] **P2-09 Test data entry**
   - Files: `core/management/commands/seed_demo.py`.
-  - Goal: idempotent command: 1 admin, 8 users, 6 categories, 25 items (with city/neighborhood variety), rentals in EVERY status, reviews, 2 conversations, 1 open and 1 resolved dispute. Print the credentials. Placeholder images generated with Pillow.
+  - Goal: idempotent command: 1 admin, 8 users, 6 categories, 25 items (with city/neighborhood variety), rentals in EVERY status, reviews, 2 conversations, 1 open and 1 resolved dispute. Print the credentials. Placeholder images generated with Pillow. Also: every user gets a fake phone `0912xxxxxxx`; at least 10 items get coordinates (Tehran, Tabriz, Isfahan neighbourhoods) and address_text; one `handed_over` rental ends in about 2 hours (for the reminder demo) and another ends in 3 days; one courier rental has a delivery point.
   - Acceptance: running it twice does not duplicate; every page of the site has data to show.
   - Commit: `feat(core): add seed_demo management command`
 
@@ -55,4 +96,6 @@ Each app has its own `urls.py` with `app_name`; root `config/urls.py` includes t
 ### Phase 2 deliverables checklist
 - [ ] every app has urls + views + templates + forms as listed
 - [ ] seed_demo works on an empty DB
+- [ ] signup + item registration send email AND SMS (console) and are visible in NotificationLog
+- [ ] maps work on item form, item detail, rental request/receipt
 - [ ] QA checklist all ticked; `db_backup/phase-2.sql`; tag `phase-2-done`

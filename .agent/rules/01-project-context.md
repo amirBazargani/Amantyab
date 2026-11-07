@@ -9,3 +9,4 @@
   Do NOT implement items from a later phase early.
 - Django apps: accounts, catalog, rentals, reviews, chat, core.
 - Every deliverable of a phase also needs a PostgreSQL dump in `db_backup/` (pg_dump, plain SQL) committed to GitHub.
+- Notifications (email AND SMS): signup confirmation, item registration confirmation, rental-ending reminder. Sending goes through `core/notifications.py`; a failed send must never break the request. Map (Leaflet + OpenStreetMap) shows pickup/delivery location. See DECISIONS D-06, D-09..D-12.
