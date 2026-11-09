@@ -73,10 +73,11 @@ Each app has its own `urls.py` with `app_name`; root `config/urls.py` includes t
   - Commit: `feat(rentals): show handover location on map`
   - Done notes: Added delivery coordinates to RentalRequestForm with cross-field geographic validation; parameterized map_picker and map_view partials; integrated courier map picker into rental_request and dynamic handover map into rental_receipt; verified all acceptance criteria via 32 rental unit tests and live shell QA.
 
-- [ ] **P2-06 rentals: lifecycle**
+- [x] **P2-06 rentals: lifecycle**
   - Files: `rentals/services.py` (transition functions with allowed-transition table), views (my_rentals, owner_rentals, rental_detail, handover, mark_returned, confirm_return, cancel), templates.
   - Acceptance: illegal transitions are impossible (button hidden + server refuses); confirm_return creates deposit_refund + payout Payment rows and sets completed; cancel rules as in DOMAIN.md.
   - Commit: `feat(rentals): add rental lifecycle actions`
+  - Done notes: Implemented FSM transition table and service functions (can_transition, handover_rental, mark_returned_rental, confirm_return_rental, cancel_rental) with select_for_update and atomic transactions; created my_rentals, owner_rentals, and rental_detail views with RTL Tailwind templates and status stepper; created POST-only protected transition endpoints with permission/validation checks; created deposit_refund and payout rows on completion; verified with 43 automated tests and live interactive shell verification.
 
 - [ ] **P2-07 reviews + chat**
   - Files: `reviews/forms.py`, views (review_create), templates; `chat/forms.py`, views (start/open conversation, send message, inbox), templates.
