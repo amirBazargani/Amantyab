@@ -670,3 +670,97 @@ class ItemMapLocationTestCase(TestCase):
         self.assertContains(res, "ستارخان، بعد از فلکه اول صادقیه")
         self.assertNotContains(res, "map-viewer")
 
+
+class ItemRegistrationNotificationTestCase(TestCase):
+    def setUp(self):
+        from core.models import NotificationLog
+
+        self.owner = User.objects.create_user(
+            username="notifowner",
+            email="notifowner@example.com",
+            password="StrongPassword123!",
+            first_name="مهرداد",
+            phone="09127778899",
+            city="تهران",
+        )
+        self.category = Category.objects.create(name="ابزار تست اعلان", slug="notif-tools")
+
+    def test_item_create_triggers_email_and_sms_notifications(self):
+        """Creating a new item sends email and SMS and creates 2 NotificationLog rows linked to the item."""
+        from core.models import NotificationLog
+
+        initial_count = NotificationLog.objects.count()
+        self.client.force_login(self.owner)
+
+        post_data = {
+            "category": self.category.pk,
+            "title": "پمپ باد فندکی خودرو",
+            "description": "پمپ باد فندکی با نمایشگر دیجیتال فشار باد",
+            "condition": Item.Condition.NEW,
+            "daily_price": "35000",
+            "city": "تهران",
+            "neighborhood": "گیشا",
+            "allow_pickup": "on",
+            "images-TOTAL_FORMS": "0",
+            "images-INITIAL_FORMS": "0",
+            "images-MIN_NUM_FORMS": "0",
+            "images-MAX_NUM_FORMS": "10",
+        }
+        res = self.client.post(reverse("catalog:item_create"), post_data)
+        item = Item.objects.filter(title="پمپ باد فندکی خودرو").first()
+        self.assertIsNotNone(item)
+        self.assertRedirects(res, reverse("catalog:item_detail", args=[item.pk]))
+
+        # Check 2 notification logs created (email + sms)
+        logs = NotificationLog.objects.filter(item=item, event="item_registered")
+        self.assertEqual(logs.count(), 2)
+
+        channels = set(logs.values_list("channel", flat=True))
+        self.assertEqual(channels, {"email", "sms"})
+
+        for log in logs:
+            self.assertEqual(log.user, self.owner)
+            self.assertEqual(log.status, "sent")
+            self.assertIn("پمپ باد فندکی خودرو", log.body)
+
+    def test_item_edit_does_not_send_notifications(self):
+        """Editing an existing item does NOT trigger any notifications."""
+        from core.models import NotificationLog
+
+        item = Item.objects.create(
+            owner=self.owner,
+            category=self.category,
+            title="آچار بکس برقی",
+            description="آچار بکس با گشتاور بالا",
+            condition=Item.Condition.LIKE_NEW,
+            daily_price=Decimal("45000"),
+            city="تهران",
+            neighborhood="گیشا",
+            allow_pickup=True,
+            is_active=True,
+        )
+
+        logs_before = NotificationLog.objects.filter(item=item).count()
+        self.client.force_login(self.owner)
+
+        edit_data = {
+            "category": self.category.pk,
+            "title": "آچار بکس برقی (ویرایش شده)",
+            "description": "توضیحات تکمیلی بدون اعلان",
+            "condition": Item.Condition.LIKE_NEW,
+            "daily_price": "50000",
+            "city": "تهران",
+            "neighborhood": "گیشا",
+            "allow_pickup": "on",
+            "images-TOTAL_FORMS": "0",
+            "images-INITIAL_FORMS": "0",
+            "images-MIN_NUM_FORMS": "0",
+            "images-MAX_NUM_FORMS": "10",
+        }
+        res = self.client.post(reverse("catalog:item_edit", args=[item.pk]), edit_data)
+        self.assertRedirects(res, reverse("catalog:item_detail", args=[item.pk]))
+
+        logs_after = NotificationLog.objects.filter(item=item).count()
+        self.assertEqual(logs_before, logs_after)
+        self.assertEqual(logs_after, 0)
+
