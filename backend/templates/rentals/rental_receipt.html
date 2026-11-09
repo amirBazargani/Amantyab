@@ -1,0 +1,118 @@
+{% extends "base.html" %}
+
+{% block title %}رسید پرداخت امانت {{ rental.tracking_code|default:rental.pk }} | امانت‌یاب{% endblock %}
+
+{% block content %}
+<div class="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8 py-8 print:p-0 print:max-w-full">
+    <!-- Success Badge (screen only) -->
+    <div class="mb-6 bg-emerald-50 border border-emerald-200 rounded-3xl p-6 text-center space-y-2 print:hidden">
+        <div class="w-12 h-12 bg-emerald-500 text-white rounded-full flex items-center justify-center mx-auto shadow-sm">
+            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7"></path>
+            </svg>
+        </div>
+        <h1 class="text-xl font-black text-emerald-950">پرداخت با موفقیت انجام شد!</h1>
+        <p class="text-xs text-emerald-700">سفارش امانت شما با موفقیت قطعی گردید. اطلاعات رسید در زیر قابل مشاهده است.</p>
+    </div>
+
+    <!-- Official Printable Receipt -->
+    <div class="bg-white rounded-3xl shadow-sm border border-gray-200 overflow-hidden print:border-none print:shadow-none space-y-6">
+        <!-- Receipt Top Header -->
+        <div class="p-6 sm:p-8 bg-gray-50 border-b border-gray-200 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+            <div>
+                <span class="text-xs text-gray-500 block mb-1">کد رهگیری رسمی سفارش:</span>
+                <span class="text-2xl font-black text-blue-700 font-mono tracking-wider">{{ rental.tracking_code }}</span>
+            </div>
+            <div class="sm:text-left text-xs text-gray-500 space-y-1">
+                <div>تاریخ صدور فاکتور: <span class="font-bold text-gray-800">{{ rental.updated_at|date:"Y/m/d - H:i" }}</span></div>
+                <div>وضعیت سفارش: <span class="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-bold bg-green-100 text-green-800">{{ rental.get_status_display }}</span></div>
+            </div>
+        </div>
+
+        <div class="p-6 sm:p-8 space-y-8">
+            <!-- Item & Parties Summary -->
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-6 pb-6 border-b border-gray-100 text-xs">
+                <!-- Item Info -->
+                <div class="space-y-2">
+                    <h3 class="font-bold text-gray-900 text-sm">اطلاعات کالا</h3>
+                    <p class="text-gray-700"><span class="text-gray-400">نام کالا:</span> <span class="font-semibold">{{ item.title }}</span></p>
+                    <p class="text-gray-700"><span class="text-gray-400">دسته‌بندی:</span> {{ item.category.name }}</p>
+                    <p class="text-gray-700"><span class="text-gray-400">مالک کالا:</span> {{ item.owner.get_full_name|default:item.owner.username }}</p>
+                    {% if item.address_text %}
+                        <p class="text-gray-700"><span class="text-gray-400">محل تحویل مالک:</span> {{ item.city }}، {{ item.neighborhood }} - {{ item.address_text }}</p>
+                    {% else %}
+                        <p class="text-gray-700"><span class="text-gray-400">موقعیت کالا:</span> {{ item.city }}، {{ item.neighborhood }}</p>
+                    {% endif %}
+                </div>
+
+                <!-- Rental & Renter Info -->
+                <div class="space-y-2">
+                    <h3 class="font-bold text-gray-900 text-sm">مشخصات تحویل و امانت‌گیرنده</h3>
+                    <p class="text-gray-700"><span class="text-gray-400">امانت‌گیرنده:</span> <span class="font-semibold">{{ rental.renter.get_full_name|default:rental.renter.username }}</span></p>
+                    <p class="text-gray-700"><span class="text-gray-400">شیوه دریافت:</span> {{ rental.get_delivery_method_display }}</p>
+                    <p class="text-gray-700"><span class="text-gray-400">بازه تحویل:</span> {{ rental.start_at|date:"Y/m/d H:i" }} الی {{ rental.end_at|date:"Y/m/d H:i" }}</p>
+                    {% if rental.delivery_address %}
+                        <p class="text-gray-700"><span class="text-gray-400">نشانی مقصد (پیک):</span> {{ rental.delivery_address }}</p>
+                    {% endif %}
+                </div>
+            </div>
+
+            <!-- Payment Transactions Table -->
+            <div class="space-y-3">
+                <h3 class="font-bold text-gray-900 text-sm">تراکنش‌های پرداخت ثبت‌شده</h3>
+                <div class="border border-gray-200 rounded-2xl overflow-hidden text-xs">
+                    <table class="w-full text-right divide-y divide-gray-200">
+                        <thead class="bg-gray-50 text-gray-500 font-semibold">
+                            <tr>
+                                <th class="p-3">نوع تراکنش</th>
+                                <th class="p-3">شماره رسید بانکی</th>
+                                <th class="p-3">زمان تراکنش</th>
+                                <th class="p-3">وضعیت</th>
+                                <th class="p-3 text-left">مبلغ (تومان)</th>
+                            </tr>
+                        </thead>
+                        <tbody class="divide-y divide-gray-100 bg-white">
+                            {% for payment in payments %}
+                                <tr>
+                                    <td class="p-3 font-semibold text-gray-900">{{ payment.get_kind_display }}</td>
+                                    <td class="p-3 font-mono text-gray-600">{{ payment.receipt_no }}</td>
+                                    <td class="p-3 text-gray-500">{{ payment.created_at|date:"Y/m/d H:i" }}</td>
+                                    <td class="p-3">
+                                        <span class="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-800">
+                                            {{ payment.get_status_display }}
+                                        </span>
+                                    </td>
+                                    <td class="p-3 text-left font-bold text-gray-900">{{ payment.amount|floatformat:0 }}</td>
+                                </tr>
+                            {% empty %}
+                                <tr>
+                                    <td colspan="5" class="p-4 text-center text-gray-400">هیچ تراکنشی یافت نشد.</td>
+                                </tr>
+                            {% endfor %}
+                        </tbody>
+                        <tfoot class="bg-gray-50 font-bold text-gray-900 border-t border-gray-200">
+                            <tr>
+                                <td colspan="4" class="p-3">مجموع پرداختی:</td>
+                                <td class="p-3 text-left text-sm text-blue-700">{{ total_paid|floatformat:0 }} تومان</td>
+                            </tr>
+                        </tfoot>
+                    </table>
+                </div>
+            </div>
+
+            <!-- Bottom Actions (screen only) -->
+            <div class="pt-6 border-t border-gray-100 flex flex-col sm:flex-row items-center justify-between gap-3 print:hidden">
+                <a href="{% url 'catalog:item_detail' item.pk %}" class="w-full sm:w-auto text-center py-2.5 px-4 bg-gray-100 hover:bg-gray-200 text-gray-700 text-xs font-semibold rounded-xl transition">
+                    ← بازگشت به صفحه کالا
+                </a>
+                <button onclick="window.print()" class="w-full sm:w-auto py-2.5 px-5 bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold rounded-xl shadow-sm transition flex items-center justify-center space-x-1.5 space-x-reverse">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z"></path>
+                    </svg>
+                    <span>چاپ رسید فاکتور</span>
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

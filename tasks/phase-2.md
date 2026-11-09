@@ -60,10 +60,11 @@ Each app has its own `urls.py` with `app_name`; root `config/urls.py` includes t
   - Commit: `feat(catalog): notify owner when an item is registered`
   - Done notes: Called core.notifications.notify upon successful item creation in item_create view; verified email and SMS console printout and 2 NotificationLog rows linked to item; verified item_edit does not send notifications via 29 catalog unit tests and live shell QA.
 
-- [ ] **P2-05 rentals: request, price, payment, receipt**
+- [x] **P2-05 rentals: request, price, payment, receipt**
   - Files: `rentals/services.py` (calculate_price, has_overlap, create_rental, simulate_payment), `forms.py` (RentalRequestForm with clean() for dates/overlap/own item), views (rental_request, rental_pay, rental_receipt), templates.
   - Acceptance: price matches the rule in DOMAIN.md (test hour and day cases by hand); overlap rejected; owner cannot rent own item; payment creates Payment rows (rent, deposit), status → confirmed, tracking_code set.
   - Commits: `feat(rentals): add pricing and overlap services` · `feat(rentals): add rental request form and views` · `feat(rentals): add simulated payment and receipt`
+  - Done notes: Implemented calculate_price (hourly/daily ceil), has_overlap, create_rental, and simulate_payment in rentals/services.py; created RentalRequestForm with validation; built views and templates for rental_request, rental_pay, and rental_receipt; verified all acceptance criteria via 25 unit tests and live shell QA.
 
 - [ ] **P2-05A Map for the handover location**
   - Files: `rentals/forms.py` (RentalRequestForm: if delivery_method = courier then delivery_address is required; optional pin via hidden delivery_latitude/longitude), rental request template (map_picker, shown only for courier), receipt and rental_detail templates (map_view).

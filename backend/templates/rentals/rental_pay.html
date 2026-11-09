@@ -1,0 +1,121 @@
+{% extends "base.html" %}
+
+{% block title %}پرداخت و تایید سفارش امانت #{{ rental.pk }} | امانت‌یاب{% endblock %}
+
+{% block content %}
+<div class="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+    <!-- Header -->
+    <div class="mb-6 text-center">
+        <span class="inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold bg-amber-100 text-amber-800 mb-2">
+            مرحله نهایی: پیش‌فاکتور و پرداخت
+        </span>
+        <h1 class="text-2xl font-black text-gray-900">پیش‌فاکتور و پرداخت امانت</h1>
+        <p class="text-xs text-gray-500 mt-1">جزئیات مالی را بازبینی کنید و با کلیک روی پرداخت، سفارش خود را نهایی سازید.</p>
+    </div>
+
+    <!-- Main Payment Card -->
+    <div class="bg-white rounded-3xl shadow-sm border border-gray-200 overflow-hidden space-y-6">
+        <!-- Item Overview Header -->
+        <div class="p-6 bg-gray-50 border-b border-gray-200 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+            <div class="flex items-center space-x-4 space-x-reverse">
+                <div class="w-16 h-16 rounded-2xl bg-white border border-gray-200 overflow-hidden flex-shrink-0 flex items-center justify-center">
+                    {% with primary_image=item.images.first %}
+                        {% if primary_image %}
+                            <img src="{{ primary_image.image.url }}" alt="{{ item.title }}" class="w-full h-full object-cover">
+                        {% else %}
+                            <span class="text-2xl">📦</span>
+                        {% endif %}
+                    {% endwith %}
+                </div>
+                <div>
+                    <span class="text-xs text-blue-600 font-semibold">{{ item.category.name }}</span>
+                    <h2 class="text-base font-bold text-gray-900">{{ item.title }}</h2>
+                    <p class="text-xs text-gray-500">مالک: {{ item.owner.get_full_name|default:item.owner.username }}</p>
+                </div>
+            </div>
+
+            <div class="text-left sm:text-right text-xs text-gray-500 space-y-1">
+                <div>شماره پیش‌فاکتور: <span class="font-bold text-gray-800">#{{ rental.pk }}</span></div>
+                <div>شیوه دریافت: <span class="font-bold text-gray-800">{{ rental.get_delivery_method_display }}</span></div>
+            </div>
+        </div>
+
+        <div class="p-6 sm:p-8 space-y-6">
+            <!-- Schedule & Delivery Details -->
+            <div class="bg-gray-50 rounded-2xl p-4 border border-gray-100 space-y-3">
+                <h3 class="text-xs font-bold text-gray-700">بازه زمانی سفارش:</h3>
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs text-gray-600">
+                    <div class="flex items-center space-x-2 space-x-reverse bg-white p-2.5 rounded-xl border border-gray-100">
+                        <span class="text-gray-400">شروع:</span>
+                        <span class="font-bold text-gray-900">{{ rental.start_at|date:"Y/m/d - H:i" }}</span>
+                    </div>
+                    <div class="flex items-center space-x-2 space-x-reverse bg-white p-2.5 rounded-xl border border-gray-100">
+                        <span class="text-gray-400">پایان:</span>
+                        <span class="font-bold text-gray-900">{{ rental.end_at|date:"Y/m/d - H:i" }}</span>
+                    </div>
+                </div>
+
+                {% if rental.delivery_address %}
+                    <div class="pt-2 text-xs text-gray-600">
+                        <span class="text-gray-400">نشانی تحویل (پیک):</span>
+                        <span class="font-medium text-gray-800 mr-1">{{ rental.delivery_address }}</span>
+                    </div>
+                {% endif %}
+            </div>
+
+            <!-- Price Breakdown Table -->
+            <div class="space-y-3">
+                <h3 class="text-xs font-bold text-gray-700">ریز محاسبات مالی:</h3>
+                <div class="border border-gray-100 rounded-2xl overflow-hidden divide-y divide-gray-100 text-sm">
+                    <div class="p-3.5 flex justify-between items-center bg-white">
+                        <span class="text-gray-600">هزینه کرایه کالا:</span>
+                        <span class="font-bold text-gray-900">{{ rental.rent_amount|floatformat:0 }} تومان</span>
+                    </div>
+                    <div class="p-3.5 flex justify-between items-center bg-blue-50/50 text-blue-950">
+                        <div>
+                            <span class="font-medium">مبلغ ودیعه تضمین:</span>
+                            <span class="text-[11px] text-blue-600 block sm:inline sm:mr-2">
+                                (پس از تحویل سالم کالا به حسابتان بازمی‌گردد)
+                            </span>
+                        </div>
+                        <span class="font-bold">
+                            {% if rental.deposit_amount > 0 %}
+                                {{ rental.deposit_amount|floatformat:0 }} تومان
+                            {% else %}
+                                ۰ تومان
+                            {% endif %}
+                        </span>
+                    </div>
+                    <div class="p-4 flex justify-between items-center bg-gray-50 text-base font-black">
+                        <span class="text-gray-900">مجموع قابل پرداخت:</span>
+                        <span class="text-blue-700 text-lg">{{ total_payable|floatformat:0 }} تومان</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Simulated Payment Gateway Box -->
+            <div class="p-5 bg-gradient-to-r from-emerald-50 to-teal-50 border border-emerald-200 rounded-2xl space-y-4">
+                <div class="flex items-center space-x-2 space-x-reverse text-emerald-800 font-bold text-sm">
+                    <svg class="w-5 h-5 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                    </svg>
+                    <span>درگاه پرداخت شبیه‌سازی‌شده (Sandbox)</span>
+                </div>
+                <p class="text-xs text-emerald-900 leading-relaxed">
+                    با کلیک روی دکمه زیر، تراکنش پرداخت کرایه و ودیعه با موفقیت در سیستم ثبت شده، سفارش قطعی گردیده و کد رهگیری اختصاصی صادر می‌شود.
+                </p>
+
+                <form method="post" class="pt-2">
+                    {% csrf_token %}
+                    <button type="submit" class="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-3.5 px-6 rounded-xl shadow-md transition flex items-center justify-center space-x-2 space-x-reverse text-sm">
+                        <span>پرداخت شبیه‌سازی‌شده ({{ total_payable|floatformat:0 }} تومان)</span>
+                        <svg class="w-4 h-4 mr-1 transform rotate-180" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14 5l7 7m0 0l-7 7m7-7H3"></path>
+                        </svg>
+                    </button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

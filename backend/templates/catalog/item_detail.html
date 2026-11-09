@@ -218,7 +218,7 @@
                         </div>
                     {% else %}
                         {% if request.user.is_authenticated %}
-                            <a href="#" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3.5 px-4 rounded-xl shadow-md transition text-center block text-sm">
+                            <a href="{% url 'rentals:rental_request' item.pk %}" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3.5 px-4 rounded-xl shadow-md transition text-center block text-sm">
                                 درخواست امانت کالا
                             </a>
                         {% else %}
