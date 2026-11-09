@@ -3,13 +3,14 @@ from decimal import Decimal, InvalidOperation
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.core.exceptions import PermissionDenied
-from django.db.models import Q
+from django.db.models import Avg, Q
 from django.http import Http404
 from django.shortcuts import get_object_or_404, redirect, render
 from django.utils import timezone
 from django.views.decorators.http import require_POST
 
 from core.notifications import notify
+from reviews.models import Review
 
 from .forms import ItemForm, ItemImageFormSet
 from .models import Category, Item
@@ -98,10 +99,23 @@ def item_detail(request, pk):
     if not primary_image and images:
         primary_image = images[0]
 
+    # Calculate reviews left for this item (by renters reviewing the owner)
+    reviews = (
+        Review.objects.filter(rental__item=item, reviewee_role=Review.Role.OWNER)
+        .select_related("reviewer")
+        .order_by("-created_at")
+    )
+    review_stats = reviews.aggregate(avg=Avg("rating"))
+    avg_rating = review_stats["avg"]
+    review_count = reviews.count()
+
     context = {
         "item": item,
         "images": images,
         "primary_image": primary_image,
+        "reviews": reviews,
+        "avg_rating": round(avg_rating, 1) if avg_rating else None,
+        "review_count": review_count,
         "is_owner": request.user.is_authenticated and request.user == item.owner,
         "can_manage": is_owner_or_staff,
     }

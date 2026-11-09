@@ -42,6 +42,33 @@
                             {{ profile_user.bio|linebreaksbr }}
                         </p>
                     {% endif %}
+
+                    <!-- Rating Summary -->
+                    <div class="flex flex-wrap items-center gap-3 mt-4 pt-4 border-t border-gray-100">
+                        {% if overall_avg %}
+                            <div class="flex items-center space-x-1.5 space-x-reverse bg-amber-50 text-amber-800 px-3 py-1.5 rounded-xl border border-amber-200 text-xs font-bold">
+                                <span class="text-amber-500 text-sm">★</span>
+                                <span>امتیاز کلی: {{ overall_avg }} از ۵</span>
+                                <span class="text-gray-400 font-normal">({{ review_count }} نظر)</span>
+                            </div>
+                            {% if owner_avg %}
+                                <div class="text-xs text-gray-600 bg-gray-50 px-2.5 py-1.5 rounded-xl border border-gray-200">
+                                    <span>امانت‌دهنده:</span>
+                                    <span class="font-bold text-gray-900">{{ owner_avg }} ★</span>
+                                </div>
+                            {% endif %}
+                            {% if renter_avg %}
+                                <div class="text-xs text-gray-600 bg-gray-50 px-2.5 py-1.5 rounded-xl border border-gray-200">
+                                    <span>امانت‌گیرنده:</span>
+                                    <span class="font-bold text-gray-900">{{ renter_avg }} ★</span>
+                                </div>
+                            {% endif %}
+                        {% else %}
+                            <div class="text-xs text-gray-400">
+                                هنوز نظری برای این کاربر ثبت نشده است.
+                            </div>
+                        {% endif %}
+                    </div>
                 </div>
             </div>
 
@@ -124,6 +151,62 @@
                 </svg>
                 <h3 class="text-base font-medium text-gray-900 mb-1">کالایی ثبت نشده است</h3>
                 <p class="text-sm text-gray-500">این کاربر در حال حاضر کالای فعالی برای امانت ندارد.</p>
+            </div>
+        {% endif %}
+    </div>
+
+    <!-- Received Reviews Section -->
+    <div class="bg-white rounded-2xl shadow-sm border border-gray-200 p-6 sm:p-8 space-y-6">
+        <div class="flex items-center justify-between border-b border-gray-100 pb-4">
+            <h2 class="text-xl font-bold text-gray-900 flex items-center space-x-2 space-x-reverse">
+                <span>نظرات و امتیازهای دریافتی</span>
+                {% if review_count %}
+                    <span class="text-sm font-normal text-gray-500">({{ review_count }} نظر)</span>
+                {% endif %}
+            </h2>
+            {% if overall_avg %}
+                <div class="flex items-center space-x-1 space-x-reverse bg-amber-50 text-amber-700 px-3 py-1 rounded-full text-sm font-bold border border-amber-200">
+                    <span>★</span>
+                    <span>{{ overall_avg }} از ۵</span>
+                </div>
+            {% endif %}
+        </div>
+
+        {% if received_reviews %}
+            <div class="space-y-4">
+                {% for rev in received_reviews %}
+                    <div class="p-4 rounded-2xl bg-gray-50/70 border border-gray-100 space-y-2 text-sm">
+                        <div class="flex items-center justify-between">
+                            <div class="flex items-center space-x-2 space-x-reverse">
+                                <div class="w-8 h-8 rounded-full bg-blue-100 text-blue-700 font-bold flex items-center justify-center text-xs">
+                                    {{ rev.reviewer.first_name|first|default:rev.reviewer.username|first|upper }}
+                                </div>
+                                <div>
+                                    <span class="font-bold text-gray-900 text-sm">
+                                        {{ rev.reviewer.get_full_name|default:rev.reviewer.username }}
+                                    </span>
+                                    <span class="text-xs text-gray-400 mr-2">
+                                        (به عنوان {{ rev.get_reviewee_role_display }} در امانت «{{ rev.rental.item.title }}»)
+                                    </span>
+                                </div>
+                            </div>
+                            <div class="flex items-center space-x-1 space-x-reverse text-amber-500 font-bold">
+                                <span>{{ rev.rating }}</span>
+                                <span>★</span>
+                            </div>
+                        </div>
+
+                        {% if rev.comment %}
+                            <p class="text-gray-700 leading-relaxed pr-10 text-xs sm:text-sm">{{ rev.comment }}</p>
+                        {% endif %}
+
+                        <div class="text-[11px] text-gray-400 text-left">{{ rev.created_at|date:"Y/m/d" }}</div>
+                    </div>
+                {% endfor %}
+            </div>
+        {% else %}
+            <div class="text-center py-8 text-gray-400 text-sm">
+                هنوز هیچ بازخورد یا نظری برای این کاربر ثبت نشده است.
             </div>
         {% endif %}
     </div>

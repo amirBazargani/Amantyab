@@ -1,11 +1,13 @@
 from django.contrib import messages
 from django.contrib.auth import get_user_model, login, logout
 from django.contrib.auth.decorators import login_required
+from django.db.models import Avg
 from django.shortcuts import get_object_or_404, redirect, render
 from django.utils.http import url_has_allowed_host_and_scheme
 
 from accounts.forms import LoginForm, ProfileForm, SignUpForm
 from core.notifications import notify
+from reviews.models import Review
 
 User = get_user_model()
 
@@ -95,11 +97,25 @@ def public_profile_view(request, username):
         .prefetch_related("images")
         .order_by("-created_at")
     )
+
+    received_reviews = (
+        profile_user.received_reviews.select_related("reviewer", "rental", "rental__item")
+        .order_by("-created_at")
+    )
+    overall_avg = received_reviews.aggregate(avg=Avg("rating"))["avg"]
+    owner_avg = received_reviews.filter(reviewee_role=Review.Role.OWNER).aggregate(avg=Avg("rating"))["avg"]
+    renter_avg = received_reviews.filter(reviewee_role=Review.Role.RENTER).aggregate(avg=Avg("rating"))["avg"]
+
     return render(
         request,
         "accounts/profile_detail.html",
         {
             "profile_user": profile_user,
             "items": items,
+            "received_reviews": received_reviews,
+            "overall_avg": round(overall_avg, 1) if overall_avg else None,
+            "owner_avg": round(owner_avg, 1) if owner_avg else None,
+            "renter_avg": round(renter_avg, 1) if renter_avg else None,
+            "review_count": received_reviews.count(),
         },
     )
