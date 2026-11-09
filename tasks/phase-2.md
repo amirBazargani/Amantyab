@@ -46,12 +46,12 @@ Each app has its own `urls.py` with `app_name`; root `config/urls.py` includes t
   - Commits: `feat(catalog): add ItemForm and image formset` · `feat(catalog): add owner item management views`
   - Done notes: Implemented ItemForm with validations and ItemImageFormSet with inline multi-image uploads; implemented my_items owner dashboard displaying active rentals, renter info, and remaining time calculation; implemented item_create, item_edit, item_toggle_active, and item_delete with 403 authorization for non-owners and deletion blockage on rented items; verified via 37 unit tests and live shell QA.
 
-- [ ] **P2-04A Map: choose and show item location**
+- [x] **P2-04A Map: choose and show item location**
   - Files: `templates/partials/map_picker.html`, `templates/partials/map_view.html`, `catalog/forms.py` (ItemForm gets latitude, longitude as hidden fields + address_text), item create/edit templates, item detail template.
   - Goal: Leaflet + OSM (CDN). Picker: click or drag a marker, writes the two hidden inputs, default centre = Tehran. Viewer: read-only map with one marker + the address text. ItemForm `clean()`: both coordinates or none, ranges valid.
   - Acceptance: owner sets a point and it persists; item detail shows the map; item without coordinates shows only the address text and no map; invalid coordinates (tampered POST) are rejected by the form.
   - Commits: `feat(core): add Leaflet map picker and viewer partials` · `feat(catalog): add pickup location to item form and detail`
-  - Done notes:
+  - Done notes: Created map_picker.html and map_view.html partials using Leaflet 1.9.4 and OpenStreetMap; embedded picker in item_form.html and viewer in item_detail.html; validated coordinates range (-90..90 and -180..180) and both-or-neither constraint in ItemForm.clean(); verified via 27 unit tests and live shell QA.
 
 - [ ] **P2-04B Item registration confirmation by email and SMS**
   - Files: `catalog/views.py` (item_create).

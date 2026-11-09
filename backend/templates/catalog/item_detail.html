@@ -132,6 +132,17 @@
                         </div>
                     </div>
                 </div>
+
+                <!-- Pickup Location Map / Address -->
+                {% if item.latitude or item.address_text %}
+                    <div class="bg-gray-50/70 p-5 rounded-2xl border border-gray-100 space-y-3">
+                        <h2 class="text-base font-bold text-gray-900 flex items-center space-x-1.5 space-x-reverse">
+                            <span class="w-2 h-2 rounded-full bg-blue-600"></span>
+                            <span>محل تحویل حضوری کالا</span>
+                        </h2>
+                        {% include "partials/map_view.html" %}
+                    </div>
+                {% endif %}
             </div>
         </div>
 

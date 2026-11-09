@@ -144,6 +144,18 @@ class ItemForm(forms.ModelForm):
                 _("مختصات جغرافیایی (عرض و طول جغرافیایی) باید یا هر دو وارد شوند یا هر دو خالی باشند.")
             )
 
+        if latitude is not None and (latitude < Decimal("-90") or latitude > Decimal("90")):
+            self.add_error(
+                "latitude",
+                _("عرض جغرافیایی معتبر نیست (باید بین ۹۰- و ۹۰ درجه باشد).")
+            )
+
+        if longitude is not None and (longitude < Decimal("-180") or longitude > Decimal("180")):
+            self.add_error(
+                "longitude",
+                _("طول جغرافیایی معتبر نیست (باید بین ۱۸۰- و ۱۸۰ درجه باشد).")
+            )
+
         return cleaned_data
 
 

@@ -189,6 +189,14 @@
                     {{ form.latitude }}
                     {{ form.longitude }}
 
+                    <!-- Map Picker -->
+                    <div class="sm:col-span-2">
+                        {% include "partials/map_picker.html" %}
+                        {% if form.latitude.errors or form.longitude.errors %}
+                            <p class="text-xs text-red-600 mt-1">{{ form.latitude.errors.0|default:form.longitude.errors.0 }}</p>
+                        {% endif %}
+                    </div>
+
                     <!-- Delivery Methods Checkboxes -->
                     <div class="sm:col-span-2 p-4 bg-gray-50 rounded-xl border border-gray-200 space-y-3">
                         <span class="block text-xs font-bold text-gray-800">روش‌های مجاز برای تحویل کالا:</span>
