@@ -9,6 +9,8 @@ from django.shortcuts import get_object_or_404, redirect, render
 from django.utils import timezone
 from django.views.decorators.http import require_POST
 
+from core.notifications import notify
+
 from .forms import ItemForm, ItemImageFormSet
 from .models import Category, Item
 
@@ -178,6 +180,9 @@ def item_create(request):
             if images and not any(img.is_primary for img in images):
                 images[0].is_primary = True
                 images[0].save(update_fields=["is_primary"])
+
+            # Notify owner upon registration of a new item (email + SMS)
+            notify(request.user, "item_registered", {"title": item.title}, item=item)
 
             messages.success(request, f"کالای «{item.title}» با موفقیت ثبت شد.")
             return redirect("catalog:item_detail", pk=item.pk)
