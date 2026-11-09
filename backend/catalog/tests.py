@@ -326,3 +326,222 @@ class ItemGeoFieldsTestCase(TestCase):
         self.assertEqual(item.latitude, Decimal("35.757500"))
         self.assertEqual(item.longitude, Decimal("51.410000"))
 
+
+class ItemOwnerManagementTestCase(TestCase):
+    def setUp(self):
+        from datetime import timedelta
+        from django.utils import timezone
+        from rentals.models import Rental
+
+        self.owner = User.objects.create_user(
+            username="itemowner",
+            email="itemowner@example.com",
+            password="StrongPassword123!",
+            first_name="فرهاد",
+            last_name="رضایی",
+            phone="09121112233",
+            city="تهران",
+        )
+        self.other_user = User.objects.create_user(
+            username="otherrenter",
+            email="renter@example.com",
+            password="StrongPassword123!",
+            first_name="سامان",
+            phone="09129998877",
+            city="تهران",
+        )
+        self.category = Category.objects.create(name="ابزار برقی", slug="electric-tools")
+
+        self.item = Item.objects.create(
+            owner=self.owner,
+            category=self.category,
+            title="فرز سنگبری رونیکس",
+            description="فرز سنگبری با قدرت بالا و صفحه برش سالم",
+            brand="Ronix",
+            condition=Item.Condition.GOOD,
+            daily_price=Decimal("80000"),
+            deposit_amount=Decimal("300000"),
+            city="تهران",
+            neighborhood="ونک",
+            allow_pickup=True,
+            allow_courier=True,
+            is_active=True,
+        )
+
+        # Rental on the item
+        now = timezone.now()
+        self.rental = Rental.objects.create(
+            item=self.item,
+            renter=self.other_user,
+            start_at=now - timedelta(days=1),
+            end_at=now + timedelta(days=2),
+            delivery_method=Rental.DeliveryMethod.PICKUP,
+            status=Rental.Status.HANDED_OVER,
+            rent_amount=Decimal("160000"),
+            deposit_amount=Decimal("300000"),
+            commission_rate=Decimal("0.15"),
+            commission_amount=Decimal("24000"),
+            owner_payout=Decimal("136000"),
+        )
+
+        # Another item owned by self.owner without any rentals
+        self.unused_item = Item.objects.create(
+            owner=self.owner,
+            category=self.category,
+            title="نردبان تلسکوپی آلومینیومی",
+            description="نردبان تاشو ۴ متری بسیار سبک و مقاوم",
+            condition=Item.Condition.NEW,
+            daily_price=Decimal("45000"),
+            city="تهران",
+            allow_pickup=True,
+            is_active=True,
+        )
+
+        self.small_gif = (
+            b"\x47\x49\x46\x38\x39\x61\x01\x00\x01\x00\x00\x00\x00\x21\xf9\x04"
+            b"\x01\x0a\x00\x01\x00\x2c\x00\x00\x00\x00\x01\x00\x01\x00\x00\x02"
+            b"\x02\x4c\x01\x00\x3b"
+        )
+
+    def test_my_items_requires_login(self):
+        """Anonymous user cannot access my_items page and is redirected to login."""
+        res = self.client.get(reverse("catalog:my_items"))
+        self.assertEqual(res.status_code, 302)
+        self.assertIn(reverse("accounts:login"), res.url)
+
+    def test_my_items_shows_owner_items_and_active_rental(self):
+        """Owner can view their own items and the remaining rental time + renter details."""
+        self.client.force_login(self.owner)
+        res = self.client.get(reverse("catalog:my_items"))
+        self.assertEqual(res.status_code, 200)
+        self.assertContains(res, "مدیریت کالاهای من")
+        self.assertContains(res, "فرز سنگبری رونیکس")
+        self.assertContains(res, "نردبان تلسکوپی آلومینیومی")
+        # Should show renter information and active rental status
+        self.assertContains(res, "هم‌اکنون در دست اجاره")
+        self.assertContains(res, "سامان")
+        self.assertContains(res, "مانده")
+
+    def test_item_create_view_get(self):
+        """Owner can load the item creation form."""
+        self.client.force_login(self.owner)
+        res = self.client.get(reverse("catalog:item_create"))
+        self.assertEqual(res.status_code, 200)
+        self.assertContains(res, "ثبت کالای جدید برای امانت")
+
+    def test_item_create_view_post_with_image(self):
+        """Owner can create an item with uploaded image and proper validation."""
+        self.client.force_login(self.owner)
+        uploaded_image = SimpleUploadedFile("tool.gif", self.small_gif, content_type="image/gif")
+
+        post_data = {
+            "category": self.category.pk,
+            "title": "اره فارسی‌بر ماکیتا",
+            "description": "اره با تیغه الماسه مناسب برش چوب",
+            "brand": "Makita",
+            "condition": Item.Condition.LIKE_NEW,
+            "daily_price": "75000",
+            "deposit_amount": "250000",
+            "city": "تهران",
+            "neighborhood": "پونک",
+            "allow_pickup": "on",
+            "address_text": "پونک، بلوار میرزابابایی",
+            # Image formset management data
+            "images-TOTAL_FORMS": "3",
+            "images-INITIAL_FORMS": "0",
+            "images-MIN_NUM_FORMS": "0",
+            "images-MAX_NUM_FORMS": "10",
+            "images-0-image": uploaded_image,
+            "images-0-is_primary": "on",
+            "images-0-order": "0",
+        }
+
+        res = self.client.post(reverse("catalog:item_create"), post_data)
+        new_item = Item.objects.filter(title="اره فارسی‌بر ماکیتا").first()
+        self.assertIsNotNone(new_item)
+        self.assertEqual(new_item.owner, self.owner)
+        self.assertEqual(new_item.city, "تهران")
+        self.assertEqual(new_item.images.count(), 1)
+        self.assertTrue(new_item.images.first().is_primary)
+        self.assertRedirects(res, reverse("catalog:item_detail", args=[new_item.pk]))
+
+    def test_item_edit_by_owner_succeeds(self):
+        """Owner can edit their own item."""
+        self.client.force_login(self.owner)
+        post_data = {
+            "category": self.category.pk,
+            "title": "فرز سنگبری رونیکس (ویرایش شده)",
+            "description": "توضیحات بروزرسانی شده",
+            "brand": "Ronix",
+            "condition": Item.Condition.GOOD,
+            "daily_price": "90000",
+            "deposit_amount": "300000",
+            "city": "تهران",
+            "neighborhood": "ونک",
+            "allow_pickup": "on",
+            "allow_courier": "on",
+            "address_text": "میدان ونک",
+            "images-TOTAL_FORMS": "0",
+            "images-INITIAL_FORMS": "0",
+            "images-MIN_NUM_FORMS": "0",
+            "images-MAX_NUM_FORMS": "10",
+        }
+        res = self.client.post(reverse("catalog:item_edit", args=[self.item.pk]), post_data)
+        self.assertRedirects(res, reverse("catalog:item_detail", args=[self.item.pk]))
+        self.item.refresh_from_db()
+        self.assertEqual(self.item.title, "فرز سنگبری رونیکس (ویرایش شده)")
+        self.assertEqual(self.item.daily_price, Decimal("90000"))
+
+    def test_item_edit_by_non_owner_forbidden(self):
+        """Non-owner user receives 403 Forbidden when trying to edit an item."""
+        self.client.force_login(self.other_user)
+        res_get = self.client.get(reverse("catalog:item_edit", args=[self.item.pk]))
+        self.assertEqual(res_get.status_code, 403)
+
+        res_post = self.client.post(
+            reverse("catalog:item_edit", args=[self.item.pk]),
+            {"title": "Hacked Title"},
+        )
+        self.assertEqual(res_post.status_code, 403)
+
+    def test_item_toggle_active_by_owner(self):
+        """Owner can toggle item is_active."""
+        self.client.force_login(self.owner)
+        self.assertTrue(self.item.is_active)
+        res = self.client.post(reverse("catalog:item_toggle_active", args=[self.item.pk]))
+        self.assertRedirects(res, reverse("catalog:my_items"))
+        self.item.refresh_from_db()
+        self.assertFalse(self.item.is_active)
+
+        # Toggle back
+        self.client.post(reverse("catalog:item_toggle_active", args=[self.item.pk]))
+        self.item.refresh_from_db()
+        self.assertTrue(self.item.is_active)
+
+    def test_item_toggle_active_by_non_owner_forbidden(self):
+        """Non-owner user receives 403 Forbidden when attempting to toggle status."""
+        self.client.force_login(self.other_user)
+        res = self.client.post(reverse("catalog:item_toggle_active", args=[self.item.pk]))
+        self.assertEqual(res.status_code, 403)
+
+    def test_item_delete_without_rentals_succeeds(self):
+        """Owner can delete an item that has no rentals."""
+        self.client.force_login(self.owner)
+        res = self.client.post(reverse("catalog:item_delete", args=[self.unused_item.pk]))
+        self.assertRedirects(res, reverse("catalog:my_items"))
+        self.assertFalse(Item.objects.filter(pk=self.unused_item.pk).exists())
+
+    def test_item_delete_by_non_owner_forbidden(self):
+        """Non-owner receives 403 Forbidden when attempting to delete an item."""
+        self.client.force_login(self.other_user)
+        res = self.client.post(reverse("catalog:item_delete", args=[self.unused_item.pk]))
+        self.assertEqual(res.status_code, 403)
+        self.assertTrue(Item.objects.filter(pk=self.unused_item.pk).exists())
+
+    def test_item_delete_with_rentals_blocked(self):
+        """Item with existing rentals cannot be deleted; warning shown and item retained."""
+        self.client.force_login(self.owner)
+        res = self.client.post(reverse("catalog:item_delete", args=[self.item.pk]))
+        self.assertRedirects(res, reverse("catalog:my_items"))
+        self.assertTrue(Item.objects.filter(pk=self.item.pk).exists())
+

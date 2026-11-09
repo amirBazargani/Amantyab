@@ -40,10 +40,11 @@ Each app has its own `urls.py` with `app_name`; root `config/urls.py` includes t
   - Commit: `feat(catalog): add pickup location fields` · `feat(rentals): add delivery location and reminder fields`
   - Done notes: Added latitude (Decimal 9,6), longitude (Decimal 9,6), and address_text to Item model with validators and CheckConstraint item_lat_lng_both_or_neither; added delivery_address, delivery_latitude, delivery_longitude, and reminder_sent_at to Rental model with validators and CheckConstraint rental_delivery_lat_lng_both_or_neither; organized admin fieldsets for both ItemAdmin and RentalAdmin; created new migrations catalog.0002 and rentals.0002 and applied them successfully to existing database; verified via manage.py check (0 issues), 26 unit tests, and shell client QA confirming IntegrityError on partial coordinates and ValidationError on out-of-range latitude.
 
-- [ ] **P2-04 catalog: owner management**
+- [x] **P2-04 catalog: owner management**
   - Files: `catalog/forms.py` (ItemForm, ItemImageFormSet), views (my_items, item_create, item_edit, item_toggle_active, item_delete), templates.
   - Acceptance: only the owner can edit/delete (others get 403); image upload works; item with rentals cannot be deleted (show message, suggest pause).
   - Commits: `feat(catalog): add ItemForm and image formset` · `feat(catalog): add owner item management views`
+  - Done notes: Implemented ItemForm with validations and ItemImageFormSet with inline multi-image uploads; implemented my_items owner dashboard displaying active rentals, renter info, and remaining time calculation; implemented item_create, item_edit, item_toggle_active, and item_delete with 403 authorization for non-owners and deletion blockage on rented items; verified via 37 unit tests and live shell QA.
 
 - [ ] **P2-04A Map: choose and show item location**
   - Files: `templates/partials/map_picker.html`, `templates/partials/map_view.html`, `catalog/forms.py` (ItemForm gets latitude, longitude as hidden fields + address_text), item create/edit templates, item detail template.
