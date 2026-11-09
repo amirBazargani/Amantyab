@@ -545,3 +545,128 @@ class ItemOwnerManagementTestCase(TestCase):
         self.assertRedirects(res, reverse("catalog:my_items"))
         self.assertTrue(Item.objects.filter(pk=self.item.pk).exists())
 
+
+class ItemMapLocationTestCase(TestCase):
+    def setUp(self):
+        self.owner = User.objects.create_user(
+            username="mapowner",
+            email="mapowner@example.com",
+            password="StrongPassword123!",
+            city="تهران",
+        )
+        self.category = Category.objects.create(name="نقشه‌برداری", slug="surveying")
+
+    def test_item_form_rejects_single_coordinate(self):
+        """ItemForm rejects submission when only latitude or only longitude is provided."""
+        from catalog.forms import ItemForm
+
+        data = {
+            "category": self.category.pk,
+            "title": "تراز مهندسی",
+            "description": "توضیحات",
+            "condition": Item.Condition.NEW,
+            "daily_price": "50000",
+            "city": "تهران",
+            "neighborhood": "انقلاب",
+            "allow_pickup": True,
+            "latitude": "35.7000",
+            # longitude is missing
+        }
+        form = ItemForm(data)
+        self.assertFalse(form.is_valid())
+        self.assertTrue(any("مختصات جغرافیایی" in err for err in form.non_field_errors()))
+
+    def test_item_form_rejects_out_of_range_coordinates(self):
+        """ItemForm rejects tampered latitude/longitude that exceed valid ranges."""
+        from catalog.forms import ItemForm
+
+        data = {
+            "category": self.category.pk,
+            "title": "دوربین توتال استیشن",
+            "description": "توضیحات",
+            "condition": Item.Condition.LIKE_NEW,
+            "daily_price": "120000",
+            "city": "تهران",
+            "neighborhood": "امیرآباد",
+            "allow_pickup": True,
+            "latitude": "95.0000",  # > 90
+            "longitude": "195.0000",  # > 180
+        }
+        form = ItemForm(data)
+        self.assertFalse(form.is_valid())
+        self.assertIn("latitude", form.errors)
+        self.assertIn("longitude", form.errors)
+
+    def test_item_create_with_coordinates_persists(self):
+        """Owner can pick a point on the map and coordinates are stored in the database."""
+        self.client.force_login(self.owner)
+        post_data = {
+            "category": self.category.pk,
+            "title": "جی‌پی‌اس دستی گارمین",
+            "description": "جی‌پی‌اس کوهنوردی با دقت بالا",
+            "condition": Item.Condition.GOOD,
+            "daily_price": "60000",
+            "city": "تهران",
+            "neighborhood": "تجریش",
+            "allow_pickup": "on",
+            "address_text": "میدان تجریش، خیابان فناخسرو",
+            "latitude": "35.805000",
+            "longitude": "51.428000",
+            "images-TOTAL_FORMS": "0",
+            "images-INITIAL_FORMS": "0",
+            "images-MIN_NUM_FORMS": "0",
+            "images-MAX_NUM_FORMS": "10",
+        }
+        res = self.client.post(reverse("catalog:item_create"), post_data)
+        item = Item.objects.filter(title="جی‌پی‌اس دستی گارمین").first()
+        self.assertIsNotNone(item)
+        self.assertRedirects(res, reverse("catalog:item_detail", args=[item.pk]))
+        self.assertEqual(item.latitude, Decimal("35.805000"))
+        self.assertEqual(item.longitude, Decimal("51.428000"))
+        self.assertEqual(item.address_text, "میدان تجریش، خیابان فناخسرو")
+
+    def test_item_detail_shows_map_when_coordinates_present(self):
+        """Item detail view renders Leaflet map viewer when coordinates exist."""
+        item = Item.objects.create(
+            owner=self.owner,
+            category=self.category,
+            title="متر لیزری بوش",
+            description="متر لیزری ۵۰ متری",
+            condition=Item.Condition.NEW,
+            daily_price=Decimal("35000"),
+            city="تهران",
+            neighborhood="ونک",
+            allow_pickup=True,
+            address_text="میدان ونک، ابتدای ملاصدرا",
+            latitude=Decimal("35.757500"),
+            longitude=Decimal("51.410000"),
+            is_active=True,
+        )
+        res = self.client.get(reverse("catalog:item_detail", args=[item.pk]))
+        self.assertEqual(res.status_code, 200)
+        self.assertContains(res, "map-viewer")
+        self.assertContains(res, "leaflet.js")
+        self.assertContains(res, "میدان ونک، ابتدای ملاصدرا")
+
+    def test_item_detail_shows_only_address_when_coordinates_absent(self):
+        """Item without coordinates shows only the address text and no map container."""
+        item = Item.objects.create(
+            owner=self.owner,
+            category=self.category,
+            title="تراز دستی مگنتی",
+            description="تراز دستی ۴۰ سانتی",
+            condition=Item.Condition.GOOD,
+            daily_price=Decimal("20000"),
+            city="تهران",
+            neighborhood="ستارخان",
+            allow_pickup=True,
+            address_text="ستارخان، بعد از فلکه اول صادقیه",
+            latitude=None,
+            longitude=None,
+            is_active=True,
+        )
+        res = self.client.get(reverse("catalog:item_detail", args=[item.pk]))
+        self.assertEqual(res.status_code, 200)
+        self.assertContains(res, "ستارخان، بعد از فلکه اول صادقیه")
+        self.assertNotContains(res, "map-viewer")
+
