@@ -2,7 +2,7 @@ from datetime import timedelta
 from decimal import Decimal
 
 from django.contrib.auth import get_user_model
-from django.core.exceptions import ValidationError
+from django.core.exceptions import PermissionDenied, ValidationError
 from django.db import IntegrityError
 from django.test import Client, TestCase
 from django.urls import reverse
@@ -13,8 +13,14 @@ from .forms import RentalRequestForm
 from .models import Payment, Rental
 from .services import (
     calculate_price,
+    can_transition,
+    cancel_rental,
+    confirm_return_rental,
     create_rental,
+    get_available_transitions,
+    handover_rental,
     has_overlap,
+    mark_returned_rental,
     simulate_payment,
 )
 
@@ -819,3 +825,311 @@ class HandoverLocationMapTestCase(TestCase):
         self.assertEqual(resp.status_code, 200)
         self.assertNotContains(resp, "receipt-map-viewer")
         self.assertContains(resp, "پونک، میدان عدل")
+
+
+class RentalLifecycleTestCase(TestCase):
+    def setUp(self):
+        self.owner = User.objects.create_user(
+            username="item_owner",
+            email="owner@test.ir",
+            password="Password123!",
+            phone="09121112233",
+        )
+        self.renter = User.objects.create_user(
+            username="item_renter",
+            email="renter@test.ir",
+            password="Password123!",
+            phone="09129998877",
+        )
+        self.stranger = User.objects.create_user(
+            username="stranger_user",
+            email="stranger@test.ir",
+            password="Password123!",
+            phone="09123334455",
+        )
+        self.staff_user = User.objects.create_user(
+            username="admin_user",
+            email="admin@test.ir",
+            password="Password123!",
+            phone="09120000000",
+            is_staff=True,
+        )
+        self.category = Category.objects.create(name="ابزار برقی", slug="power-tools")
+        self.item = Item.objects.create(
+            owner=self.owner,
+            category=self.category,
+            title="اره فارسی بر ماکیتا",
+            description="اره دقیق نجاری",
+            condition=Item.Condition.LIKE_NEW,
+            daily_price=Decimal("200000"),
+            deposit_amount=Decimal("500000"),
+            city="تهران",
+            neighborhood="ونک",
+            allow_pickup=True,
+            allow_courier=True,
+        )
+
+    def _create_confirmed_rental(self):
+        start = timezone.now() + timedelta(days=1)
+        end = start + timedelta(days=2)
+        rental = create_rental(
+            renter=self.renter,
+            item=self.item,
+            start_at=start,
+            end_at=end,
+            delivery_method=Rental.DeliveryMethod.PICKUP,
+        )
+        simulate_payment(rental)
+        rental.refresh_from_db()
+        return rental
+
+    def test_can_transition_matrix(self):
+        """Test allowed transition checks for various actors and states."""
+        start = timezone.now() + timedelta(days=1)
+        end = start + timedelta(days=2)
+        rental = create_rental(
+            renter=self.renter,
+            item=self.item,
+            start_at=start,
+            end_at=end,
+        )
+
+        # pending_payment
+        self.assertTrue(can_transition(rental, Rental.Status.CONFIRMED, self.renter))
+        self.assertFalse(can_transition(rental, Rental.Status.CONFIRMED, self.owner))
+        self.assertTrue(can_transition(rental, Rental.Status.CANCELLED, self.renter))
+        self.assertTrue(can_transition(rental, Rental.Status.CANCELLED, self.owner))
+        self.assertFalse(can_transition(rental, Rental.Status.CANCELLED, self.stranger))
+        self.assertFalse(can_transition(rental, Rental.Status.HANDED_OVER, self.owner))
+
+        # confirmed
+        simulate_payment(rental)
+        rental.refresh_from_db()
+        self.assertTrue(can_transition(rental, Rental.Status.HANDED_OVER, self.owner))
+        self.assertFalse(can_transition(rental, Rental.Status.HANDED_OVER, self.renter))
+        self.assertFalse(can_transition(rental, Rental.Status.HANDED_OVER, self.stranger))
+        self.assertTrue(can_transition(rental, Rental.Status.HANDED_OVER, self.staff_user))
+        self.assertTrue(can_transition(rental, Rental.Status.CANCELLED, self.owner))
+        self.assertTrue(can_transition(rental, Rental.Status.CANCELLED, self.renter))
+        self.assertFalse(can_transition(rental, Rental.Status.COMPLETED, self.owner))
+
+    def test_handover_transition(self):
+        """Owner can handover confirmed rental; renter/stranger cannot."""
+        rental = self._create_confirmed_rental()
+
+        # Stranger cannot handover
+        with self.assertRaises(PermissionDenied):
+            handover_rental(rental, self.stranger)
+
+        # Renter cannot handover
+        with self.assertRaises(PermissionDenied):
+            handover_rental(rental, self.renter)
+
+        # Owner can handover
+        handover_rental(rental, self.owner)
+        rental.refresh_from_db()
+        self.assertEqual(rental.status, Rental.Status.HANDED_OVER)
+
+        # Cannot handover again
+        with self.assertRaises(ValidationError):
+            handover_rental(rental, self.owner)
+
+    def test_mark_returned_transition(self):
+        """Renter can mark handed_over rental as returned; owner cannot."""
+        rental = self._create_confirmed_rental()
+        handover_rental(rental, self.owner)
+        rental.refresh_from_db()
+
+        # Owner cannot mark returned
+        with self.assertRaises(PermissionDenied):
+            mark_returned_rental(rental, self.owner)
+
+        # Stranger cannot mark returned
+        with self.assertRaises(PermissionDenied):
+            mark_returned_rental(rental, self.stranger)
+
+        # Renter marks returned
+        mark_returned_rental(rental, self.renter)
+        rental.refresh_from_db()
+        self.assertEqual(rental.status, Rental.Status.RETURNED)
+
+        # Cannot mark returned again
+        with self.assertRaises(ValidationError):
+            mark_returned_rental(rental, self.renter)
+
+    def test_confirm_return_creates_deposit_refund_and_payout(self):
+        """Confirming return transitions to completed and creates deposit_refund + payout payments."""
+        rental = self._create_confirmed_rental()
+        handover_rental(rental, self.owner)
+        mark_returned_rental(rental, self.renter)
+        rental.refresh_from_db()
+
+        # Renter cannot confirm return
+        with self.assertRaises(PermissionDenied):
+            confirm_return_rental(rental, self.renter)
+
+        # Owner confirms return
+        confirm_return_rental(rental, self.owner)
+        rental.refresh_from_db()
+        self.assertEqual(rental.status, Rental.Status.COMPLETED)
+
+        # Verify payments created
+        refund_payment = Payment.objects.filter(
+            rental=rental,
+            kind=Payment.Kind.DEPOSIT_REFUND,
+            status=Payment.Status.SUCCESS,
+        ).first()
+        self.assertIsNotNone(refund_payment)
+        self.assertEqual(refund_payment.amount, rental.deposit_amount)
+
+        payout_payment = Payment.objects.filter(
+            rental=rental,
+            kind=Payment.Kind.PAYOUT,
+            status=Payment.Status.SUCCESS,
+        ).first()
+        self.assertIsNotNone(payout_payment)
+        self.assertEqual(payout_payment.amount, rental.owner_payout)
+
+        # Calling confirm_return on already completed rental raises ValidationError
+        with self.assertRaises(ValidationError):
+            confirm_return_rental(rental, self.owner)
+
+    def test_cancel_pending_payment_no_refund_row(self):
+        """Cancelling pending_payment rental does not create refund payments."""
+        start = timezone.now() + timedelta(days=1)
+        end = start + timedelta(days=2)
+        rental = create_rental(
+            renter=self.renter,
+            item=self.item,
+            start_at=start,
+            end_at=end,
+        )
+
+        cancel_rental(rental, self.renter)
+        rental.refresh_from_db()
+        self.assertEqual(rental.status, Rental.Status.CANCELLED)
+        self.assertEqual(rental.payments.count(), 0)
+
+    def test_cancel_confirmed_creates_deposit_refund(self):
+        """Cancelling confirmed rental creates deposit_refund payment for deposit amount."""
+        rental = self._create_confirmed_rental()
+
+        cancel_rental(rental, self.owner)
+        rental.refresh_from_db()
+        self.assertEqual(rental.status, Rental.Status.CANCELLED)
+
+        refund_payment = Payment.objects.filter(
+            rental=rental,
+            kind=Payment.Kind.DEPOSIT_REFUND,
+            status=Payment.Status.SUCCESS,
+        ).first()
+        self.assertIsNotNone(refund_payment)
+        self.assertEqual(refund_payment.amount, rental.deposit_amount)
+
+    def test_cannot_cancel_after_handover(self):
+        """Cannot cancel rental once item has been handed over."""
+        rental = self._create_confirmed_rental()
+        handover_rental(rental, self.owner)
+        rental.refresh_from_db()
+
+        with self.assertRaises(ValidationError):
+            cancel_rental(rental, self.renter)
+
+        with self.assertRaises(ValidationError):
+            cancel_rental(rental, self.owner)
+
+    def test_my_rentals_view(self):
+        """my_rentals shows only current user's rentals as renter."""
+        rental = self._create_confirmed_rental()
+        client = Client()
+        client.force_login(self.renter)
+
+        resp = client.get(reverse("rentals:my_rentals"))
+        self.assertEqual(resp.status_code, 200)
+        self.assertContains(resp, "امانت‌های من")
+        self.assertContains(resp, self.item.title)
+        self.assertContains(resp, rental.tracking_code)
+
+        # Owner looking at my_rentals should see empty
+        client.force_login(self.owner)
+        resp = client.get(reverse("rentals:my_rentals"))
+        self.assertEqual(resp.status_code, 200)
+        self.assertNotContains(resp, rental.tracking_code)
+
+    def test_owner_rentals_view(self):
+        """owner_rentals shows rental requests on current user's items."""
+        rental = self._create_confirmed_rental()
+        client = Client()
+        client.force_login(self.owner)
+
+        resp = client.get(reverse("rentals:owner_rentals"))
+        self.assertEqual(resp.status_code, 200)
+        self.assertContains(resp, "درخواست‌های اجاره کالاهای من")
+        self.assertContains(resp, self.item.title)
+        self.assertContains(resp, rental.tracking_code)
+
+        # Renter looking at owner_rentals should see empty
+        client.force_login(self.renter)
+        resp = client.get(reverse("rentals:owner_rentals"))
+        self.assertEqual(resp.status_code, 200)
+        self.assertNotContains(resp, rental.tracking_code)
+
+    def test_rental_detail_permissions_and_action_buttons(self):
+        """rental_detail is protected and displays action buttons only to authorized parties."""
+        rental = self._create_confirmed_rental()
+        client = Client()
+
+        # Stranger gets 403
+        client.force_login(self.stranger)
+        resp = client.get(reverse("rentals:rental_detail", kwargs={"pk": rental.pk}))
+        self.assertEqual(resp.status_code, 403)
+
+        # Owner sees handover button, but not return button
+        client.force_login(self.owner)
+        resp = client.get(reverse("rentals:rental_detail", kwargs={"pk": rental.pk}))
+        self.assertEqual(resp.status_code, 200)
+        self.assertContains(resp, "تأیید تحویل کالا به مستأجر")
+        self.assertNotContains(resp, "اعلام بازگرداندن کالا به موجر")
+
+        # Renter does not see handover button
+        client.force_login(self.renter)
+        resp = client.get(reverse("rentals:rental_detail", kwargs={"pk": rental.pk}))
+        self.assertEqual(resp.status_code, 200)
+        self.assertNotContains(resp, "تأیید تحویل کالا به مستأجر")
+
+    def test_lifecycle_view_actions_post_endpoints(self):
+        """POST endpoints for handover, mark_returned, confirm_return, cancel."""
+        rental = self._create_confirmed_rental()
+        client = Client()
+
+        # 1. GET requests are rejected with 405 Method Not Allowed
+        client.force_login(self.owner)
+        resp = client.get(reverse("rentals:handover", kwargs={"pk": rental.pk}))
+        self.assertEqual(resp.status_code, 405)
+
+        # 2. Handover via POST by owner
+        resp = client.post(reverse("rentals:handover", kwargs={"pk": rental.pk}))
+        self.assertEqual(resp.status_code, 302)
+        rental.refresh_from_db()
+        self.assertEqual(rental.status, Rental.Status.HANDED_OVER)
+
+        # 3. Mark returned via POST by renter
+        client.force_login(self.renter)
+        resp = client.post(reverse("rentals:mark_returned", kwargs={"pk": rental.pk}))
+        self.assertEqual(resp.status_code, 302)
+        rental.refresh_from_db()
+        self.assertEqual(rental.status, Rental.Status.RETURNED)
+
+        # 4. Confirm return via POST by owner
+        client.force_login(self.owner)
+        resp = client.post(reverse("rentals:confirm_return", kwargs={"pk": rental.pk}))
+        self.assertEqual(resp.status_code, 302)
+        rental.refresh_from_db()
+        self.assertEqual(rental.status, Rental.Status.COMPLETED)
+        self.assertTrue(
+            Payment.objects.filter(rental=rental, kind=Payment.Kind.DEPOSIT_REFUND).exists()
+        )
+        self.assertTrue(
+            Payment.objects.filter(rental=rental, kind=Payment.Kind.PAYOUT).exists()
+        )
+
