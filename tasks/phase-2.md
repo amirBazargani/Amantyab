@@ -79,10 +79,11 @@ Each app has its own `urls.py` with `app_name`; root `config/urls.py` includes t
   - Commit: `feat(rentals): add rental lifecycle actions`
   - Done notes: Implemented FSM transition table and service functions (can_transition, handover_rental, mark_returned_rental, confirm_return_rental, cancel_rental) with select_for_update and atomic transactions; created my_rentals, owner_rentals, and rental_detail views with RTL Tailwind templates and status stepper; created POST-only protected transition endpoints with permission/validation checks; created deposit_refund and payout rows on completion; verified with 43 automated tests and live interactive shell verification.
 
-- [ ] **P2-07 reviews + chat**
+- [x] **P2-07 reviews + chat**
   - Files: `reviews/forms.py`, views (review_create), templates; `chat/forms.py`, views (start/open conversation, send message, inbox), templates.
   - Acceptance: review only after completed, once per side; averages appear on profile and item page; messages show in order; only the 2 participants can open a conversation.
   - Commits: `feat(reviews): add two-way review form and views` · `feat(chat): add conversations and messages`
+  - Done notes: Implemented ReviewForm and review_create view with permission checks and once-per-side validation on completed rentals; integrated average ratings and review lists into item detail and user profile pages; added review action to completed rentals; implemented MessageForm and chat views (inbox, start_conversation, conversation_detail) with 403 checks for outsiders and automatic read status update; created RTL Tailwind chat and review templates and added chat link to navbar; verified with 25 unit tests and live shell execution.
 
 - [ ] **P2-08 disputes + admin dashboard**
   - Files: `rentals/forms.py` (DisputeForm, DisputeResolveForm), views (dispute_open, admin_dispute_list, admin_dispute_resolve, admin_dashboard), templates. Staff-only checks.

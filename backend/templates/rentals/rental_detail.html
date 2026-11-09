@@ -185,6 +185,56 @@
         </div>
     {% endif %}
 
+    <!-- Reviews Section for Completed Rental -->
+    {% if rental.status == 'completed' %}
+        <div class="bg-white border border-gray-200 p-6 rounded-2xl shadow-sm space-y-4">
+            <div class="flex items-center justify-between pb-3 border-b border-gray-100">
+                <div class="flex items-center space-x-2 space-x-reverse text-gray-900 font-bold text-sm">
+                    <svg class="w-5 h-5 text-amber-500" fill="currentColor" viewBox="0 0 20 20">
+                        <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z"></path>
+                    </svg>
+                    <span>نظرات و امتیازهای این امانت</span>
+                </div>
+
+                {% if can_review %}
+                    <a href="{% url 'reviews:review_create' rental.pk %}" class="inline-flex items-center space-x-1.5 space-x-reverse bg-amber-500 hover:bg-amber-600 text-white font-bold px-4 py-2 rounded-xl text-xs shadow-sm transition">
+                        <span>ثبت نظر و امتیاز شما</span>
+                    </a>
+                {% elif has_reviewed %}
+                    <span class="text-xs bg-emerald-50 text-emerald-700 px-3 py-1 rounded-full border border-emerald-200 font-medium">
+                        ✓ شما نظر خود را ثبت کرده‌اید
+                    </span>
+                {% endif %}
+            </div>
+
+            {% if reviews %}
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    {% for rev in reviews %}
+                        <div class="p-4 rounded-xl border border-gray-100 bg-gray-50/60 space-y-2 text-xs">
+                            <div class="flex items-center justify-between">
+                                <span class="font-bold text-gray-900">
+                                    {{ rev.reviewer.get_full_name|default:rev.reviewer.username }}
+                                    <span class="text-gray-400 font-normal">({{ rev.get_reviewee_role_display }})</span>
+                                </span>
+                                <span class="inline-flex items-center text-amber-600 font-bold">
+                                    {{ rev.rating }} ★
+                                </span>
+                            </div>
+                            {% if rev.comment %}
+                                <p class="text-gray-700 leading-relaxed">{{ rev.comment }}</p>
+                            {% else %}
+                                <p class="text-gray-400 italic">بدون متن نظر</p>
+                            {% endif %}
+                            <div class="text-[11px] text-gray-400 text-left">{{ rev.created_at|date:"Y/m/d H:i" }}</div>
+                        </div>
+                    {% endfor %}
+                </div>
+            {% else %}
+                <p class="text-xs text-gray-500 py-2">هنوز نظری برای این امانت ثبت نشده است.</p>
+            {% endif %}
+        </div>
+    {% endif %}
+
     <!-- Details Grid -->
     <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
         <!-- Item & Parties Card (col-span-2) -->

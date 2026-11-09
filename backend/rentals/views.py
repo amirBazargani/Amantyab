@@ -208,11 +208,22 @@ def rental_detail(request, pk):
     payments = rental.payments.order_by("created_at")
     total_paid = sum(p.amount for p in payments if p.status == p.Status.SUCCESS)
 
+    reviews = list(rental.reviews.select_related("reviewer", "reviewee").all())
+    has_reviewed = any(r.reviewer_id == request.user.pk for r in reviews)
+    can_review = (
+        rental.status == Rental.Status.COMPLETED
+        and not has_reviewed
+        and (request.user.pk in (rental.renter_id, rental.item.owner_id))
+    )
+
     context = {
         "rental": rental,
         "item": rental.item,
         "payments": payments,
         "total_paid": total_paid,
+        "reviews": reviews,
+        "has_reviewed": has_reviewed,
+        "can_review": can_review,
         "is_owner": request.user.pk == rental.item.owner_id,
         "is_renter": request.user.pk == rental.renter_id,
         "can_pay": rental.status == Rental.Status.PENDING_PAYMENT and (request.user.pk == rental.renter_id or request.user.is_staff),

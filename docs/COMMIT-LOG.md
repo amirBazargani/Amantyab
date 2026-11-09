@@ -318,6 +318,27 @@
 - مفهوم جنگو/پایتون که استفاده شد: پیاده‌سازی ماشین وضعیت محدود (Finite State Machine) با جدول انتقالات مجاز در لایه سرویس؛ جلوگیری از Race Condition با تراکنش‌های اتمیک `@transaction.atomic` و قفل پایگاه داده `select_for_update()`؛ ایمن‌سازی متدهای تغییر وضعیت با دکوراتور `@require_POST` و حفاظت CSRF؛ کنترل دسترسی شیء‌محور بر پایه نقش کاربر (`PermissionDenied` برای کاربران غیرمجاز و `ValidationError` برای پرش‌های غیرمجاز وضعیت).
 - اگر استاد بپرسد: چرا برای تغییر وضعیت سفارش‌ها از متد POST استفاده شده و عملیات به صورت مستقیم در متد GET انجام نمی‌شود؟ پاسخ: تغییر وضعیت سفارش یک عملیات با اثر جانبی (Side Effect) بر داده‌ها و وضعیت‌های مالی است. طبق استانداردهای HTTP و امنیت وب جنگو، متدهای GET باید امن (Safe) و فاقد اثر جانبی (Idempotent / Read-only) باشند تا از آسیب‌پذیری‌هایی مانند اجرای ناخواسته عملیات از طریق Prefetch مرورگرها، خزنده‌ها یا حملات CSRF جلوگیری شود. استفاده از `@require_POST` و توکن `csrf_token` تضمین می‌کند که این عملیات تنها با درخواست عمدی و معتبر کاربر صورت می‌پذیرد.
 
+---
+
+### 639362b — feat(reviews): add two-way review form and views
+- تسک: P2-07
+- چه چیزی تغییر کرد: پیاده‌سازی فرم ثبت نظر و امتیاز `ReviewForm` با انتخاب امتیاز ۱ تا ۵ و متن اختیاری؛ پیاده‌سازی ویوی `review_create` با کنترل دسترسی منحصراً برای طرفین امانت (امانت‌گیرنده در برابر موجر و موجر در برابر امانت‌گیرنده)، فقط پس از تکمیل امانت (`completed`) و اکیداً یک‌بار به ازای هر طرف؛ ایجاد قالب فرم ثبت نظر `review_form.html`؛ نمایش دکمه ثبت نظر و فهرست نظرات ثبت‌شده در `rental_detail.html`؛ محاسبه و نمایش میانگین امتیاز کالا و نظرات امانت‌گیرندگان در `item_detail.html`؛ محاسبه و نمایش میانگین امتیاز کلی و تفکیک‌شده (به عنوان موجر / مستأجر) و نظرات دریافتی در صفحه پروفایل عمومی `profile_detail.html`؛ و افزودن ۱۴ تست خودکار در `reviews/tests.py`.
+- چرا لازم بود: طبق مستندات دامنه `DOMAIN.md` و معیارهای پذیرش تسک P2-07، ایجاد سیستم اعتماد همتابه‌همتا از طریق ثبت نظرات دوطرفه و شفاف‌سازی سابقه کاربران و کیفیت کالاهای امانتی.
+- فایل‌های مهم: `backend/reviews/forms.py`, `backend/reviews/views.py`, `backend/reviews/urls.py`, `backend/reviews/tests.py`, `backend/templates/reviews/review_form.html`, `backend/rentals/views.py`, `backend/templates/rentals/rental_detail.html`, `backend/accounts/views.py`, `backend/templates/accounts/profile_detail.html`, `backend/catalog/views.py`, `backend/templates/catalog/item_detail.html`, `backend/config/urls.py`.
+- مفهوم جنگو/پایتون که استفاده شد: تجمیع دیتابیس با `Avg` در جنگو ORM، فرم‌های مدل (`ModelForm`) با متد `clean_rating()`، کنترل دسترسی شیء‌محور با `PermissionDenied`، روابط کلید خارجی چندگانه با `related_name`های تفکیک‌شده (`written_reviews` و `received_reviews`) و تست‌های یکپارچگی پایگاه‌داده.
+- اگر استاد بپرسد: چگونه جلوی ثبت نظر مکرر یا ثبت نظر قبل از تحویل کالا گرفته می‌شود؟ پاسخ: در دو لایه اعتبارسنجی صورت می‌پذیرد: اول در لایه دیتابیس و مدل با `CheckConstraint` و `UniqueConstraint(rental, reviewer)` و متد `clean()` مدل که وضعیت `completed` و تطابق نقش‌ها را بررسی می‌کند؛ دوم در لایه ویو که در صورت وجود رکورد پیشین یا کامل نبودن سفارش، با پیام هشدار کاربر را به صفحه جزئیات سفارش هدایت می‌کند.
+
+---
+
+### 3ed1d7f — feat(chat): add conversations and messages
+- تسک: P2-07
+- چه چیزی تغییر کرد: پیاده‌سازی فرم ارسال پیام `MessageForm`؛ ایجاد ویوی صندوق پیام‌ها (`inbox`) برای نمایش تمامی گفتگوهای کاربر با شمارش پیام‌های خوانده‌نشده و آخرین پیام؛ ایجاد ویوی `start_conversation` با ممانعت از ایجاد گفتگو با خود برای مالک کالا؛ ایجاد ویوی محیط گفتگو `conversation_detail` با اعتبارسنجی امنیتی جهت جلوگیری از دسترسی هر شخص ثالثی به جز ۲ طرف، مرتب‌سازی زمانی صعودی پیام‌ها و علامت‌گذاری خودکار پیام‌های دریافتی به عنوان خوانده‌شده (`is_read=True`)؛ ایجاد قالب‌های `inbox.html` و `conversation_detail.html`؛ افزودن دکمه آغاز گفتگو با مالک کالا در `item_detail.html`؛ افزودن لینک صندوق پیام‌ها به نوار ناوبری؛ و نگارش ۱۱ تست خودکار در `chat/tests.py`.
+- چرا لازم بود: فراهم‌سازی بستر ارتباطی مستقیم، امن و مرتبط با کالا میان همسایگان جهت هماهنگی و مذاکره پیرامون امانت کالا طبق نیازمندی‌های تسک P2-07.
+- فایل‌های مهم: `backend/chat/forms.py`, `backend/chat/views.py`, `backend/chat/urls.py`, `backend/chat/tests.py`, `backend/templates/chat/inbox.html`, `backend/templates/chat/conversation_detail.html`, `backend/templates/catalog/item_detail.html`, `backend/templates/partials/navbar.html`, `backend/config/urls.py`.
+- مفهوم جنگو/پایتون که استفاده شد: کوئری‌های پیچیده با شیء `Q` در جنگو ORM برای فیلتر دوطرفه گفتگوها (`renter == user | owner == user`)، بهینه‌سازی بارگذاری داده‌ها با `select_related` و `prefetch_related` جهت جلوگیری از مشکل N+1، کنترل دسترسی (`PermissionDenied`) برای کاربران غیرمجاز، و به‌روزرسانی دسته‌ای فیلدهای وضعیت با `QuerySet.update(is_read=True)`.
+- اگر استاد بپرسد: چرا شناسه کالا در مدل گفتگو (`Conversation`) گنجانده شده و یک گفتگوی عمومی بین دو کاربر نیست؟ پاسخ: طبق مدل دامنه در `DOMAIN.md`، امانت‌یاب یک پلتفرم مبادله کالا است؛ بنابراین گفتگوها کالا-محور هستند (`UniqueConstraint(item, renter)`). این طراحی باعث می‌شود تمام سوالات و هماهنگی‌های پیرامون یک کالای خاص در یک رشته پیام متمرکز بماند و اگر همان دو کاربر درباره کالای دیگری صحبت کنند، تاریخچه هر کالا مستقل و شفاف حفظ شود.
+
+
 
 
 

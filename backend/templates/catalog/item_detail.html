@@ -78,7 +78,7 @@
                         {{ item.title }}
                     </h1>
 
-                    <div class="flex items-center text-xs sm:text-sm text-gray-500 mt-3 space-x-3 space-x-reverse">
+                    <div class="flex items-center text-xs sm:text-sm text-gray-500 mt-3 space-x-3 space-x-reverse flex-wrap gap-y-2">
                         <div class="flex items-center space-x-1 space-x-reverse">
                             <svg class="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"></path>
@@ -88,6 +88,14 @@
                         </div>
                         <span>•</span>
                         <div>ثبت در {{ item.created_at|date:"Y/m/d" }}</div>
+                        {% if avg_rating %}
+                            <span>•</span>
+                            <div class="flex items-center space-x-1 space-x-reverse text-amber-600 font-bold">
+                                <span>★</span>
+                                <span>{{ avg_rating }}</span>
+                                <span class="text-gray-400 font-normal">({{ review_count }} نظر)</span>
+                            </div>
+                        {% endif %}
                     </div>
                 </div>
 
@@ -141,6 +149,55 @@
                             <span>محل تحویل حضوری کالا</span>
                         </h2>
                         {% include "partials/map_view.html" %}
+                    </div>
+                {% endif %}
+            </div>
+
+            <!-- Reviews Section -->
+            <div class="bg-white rounded-3xl border border-gray-200 p-6 sm:p-8 shadow-sm space-y-6">
+                <div class="flex items-center justify-between border-b border-gray-100 pb-4">
+                    <h2 class="text-lg font-bold text-gray-900 flex items-center space-x-2 space-x-reverse">
+                        <span>نظرات و امتیازهای امانت‌گیرندگان</span>
+                        {% if review_count %}
+                            <span class="text-sm font-normal text-gray-500">({{ review_count }} نظر)</span>
+                        {% endif %}
+                    </h2>
+                    {% if avg_rating %}
+                        <div class="flex items-center space-x-1 space-x-reverse bg-amber-50 text-amber-700 px-3 py-1 rounded-full text-sm font-bold border border-amber-200">
+                            <span>★</span>
+                            <span>{{ avg_rating }} از ۵</span>
+                        </div>
+                    {% endif %}
+                </div>
+
+                {% if reviews %}
+                    <div class="space-y-4">
+                        {% for rev in reviews %}
+                            <div class="p-4 rounded-2xl bg-gray-50/70 border border-gray-100 space-y-2">
+                                <div class="flex items-center justify-between">
+                                    <div class="flex items-center space-x-2 space-x-reverse">
+                                        <div class="w-8 h-8 rounded-full bg-blue-100 text-blue-700 font-bold flex items-center justify-center text-xs">
+                                            {{ rev.reviewer.first_name|first|default:rev.reviewer.username|first|upper }}
+                                        </div>
+                                        <span class="font-bold text-gray-800 text-sm">
+                                            {{ rev.reviewer.get_full_name|default:rev.reviewer.username }}
+                                        </span>
+                                    </div>
+                                    <div class="flex items-center space-x-1 space-x-reverse text-amber-500 text-sm font-bold">
+                                        <span>{{ rev.rating }}</span>
+                                        <span>★</span>
+                                    </div>
+                                </div>
+                                {% if rev.comment %}
+                                    <p class="text-sm text-gray-700 leading-relaxed pr-10">{{ rev.comment }}</p>
+                                {% endif %}
+                                <div class="text-[11px] text-gray-400 text-left">{{ rev.created_at|date:"Y/m/d" }}</div>
+                            </div>
+                        {% endfor %}
+                    </div>
+                {% else %}
+                    <div class="text-center py-8 text-gray-400 text-sm">
+                        هنوز نظری برای این کالا ثبت نشده است. پس از اولین تجربه امانت، نظرات در این بخش نمایش داده می‌شوند.
                     </div>
                 {% endif %}
             </div>
@@ -221,9 +278,21 @@
                             <a href="{% url 'rentals:rental_request' item.pk %}" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3.5 px-4 rounded-xl shadow-md transition text-center block text-sm">
                                 درخواست امانت کالا
                             </a>
+                            <a href="{% url 'chat:start_conversation' item.pk %}" class="w-full bg-white hover:bg-gray-50 text-gray-700 font-bold py-2.5 px-4 rounded-xl border border-gray-200 transition text-center block text-sm flex items-center justify-center space-x-2 space-x-reverse">
+                                <svg class="w-4 h-4 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"></path>
+                                </svg>
+                                <span>گفتگو با مالک کالا</span>
+                            </a>
                         {% else %}
                             <a href="{% url 'accounts:login' %}?next={{ request.path }}" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3.5 px-4 rounded-xl shadow-md transition text-center block text-sm">
                                 ورود برای درخواست امانت
+                            </a>
+                            <a href="{% url 'accounts:login' %}?next={{ request.path }}" class="w-full bg-white hover:bg-gray-50 text-gray-700 font-bold py-2.5 px-4 rounded-xl border border-gray-200 transition text-center block text-sm flex items-center justify-center space-x-2 space-x-reverse">
+                                <svg class="w-4 h-4 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"></path>
+                                </svg>
+                                <span>ورود برای گفتگو با مالک</span>
                             </a>
                         {% endif %}
                     {% endif %}
