@@ -1,0 +1,127 @@
+{% extends "base.html" %}
+
+{% block title %}گفتگو پیرامون {{ item.title }} | امانت‌یاب{% endblock %}
+
+{% block content %}
+<div class="max-w-4xl mx-auto my-6 flex flex-col h-[calc(100vh-12rem)] min-h-[550px] bg-white rounded-3xl border border-gray-200 shadow-sm overflow-hidden">
+    <!-- Header -->
+    <div class="p-4 sm:p-5 border-b border-gray-100 flex items-center justify-between gap-4 bg-white z-10">
+        <div class="flex items-center space-x-3.5 space-x-reverse min-w-0">
+            <a href="{% url 'chat:inbox' %}" class="p-2 text-gray-400 hover:text-gray-700 hover:bg-gray-100 rounded-xl transition flex-shrink-0" title="بازگشت به صندوق">
+                <svg class="w-5 h-5 transform rotate-180" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14 5l7 7m0 0l-7 7m7-7H3"></path>
+                </svg>
+            </a>
+
+            <div class="w-10 h-10 rounded-full bg-blue-100 text-blue-700 font-bold flex items-center justify-center text-sm flex-shrink-0">
+                {{ counterpart.first_name|first|default:counterpart.username|first|upper }}
+            </div>
+
+            <div class="min-w-0">
+                <div class="flex items-center gap-2">
+                    <span class="font-bold text-gray-900 text-sm truncate">
+                        {{ counterpart.get_full_name|default:counterpart.username }}
+                    </span>
+                    <span class="text-[11px] text-gray-400">
+                        {% if is_renter %}(مالک کالا){% else %}(امانت‌گیرنده){% endif %}
+                    </span>
+                </div>
+                <div class="text-xs text-gray-500 truncate">
+                    موضوع گفتگو: <span class="font-medium text-blue-600">{{ item.title }}</span>
+                </div>
+            </div>
+        </div>
+
+        <div class="flex items-center space-x-2 space-x-reverse flex-shrink-0">
+            <a href="{% url 'catalog:item_detail' item.pk %}" class="inline-flex items-center space-x-1 space-x-reverse px-3 py-1.5 bg-gray-50 hover:bg-gray-100 text-gray-700 rounded-xl text-xs font-medium border border-gray-200 transition">
+                <svg class="w-3.5 h-3.5 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path>
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"></path>
+                </svg>
+                <span>مشاهده کالا</span>
+            </a>
+
+            {% if is_renter %}
+                <a href="{% url 'rentals:rental_request' item.pk %}" class="hidden sm:inline-flex items-center px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold shadow-sm transition">
+                    درخواست امانت
+                </a>
+            {% endif %}
+        </div>
+    </div>
+
+    <!-- Messages Body (Scrollable) -->
+    <div id="messages-container" class="flex-grow p-4 sm:p-6 overflow-y-auto space-y-4 bg-gray-50/50">
+        {% if messages_list %}
+            {% for msg in messages_list %}
+                {% if msg.sender_id == request.user.pk %}
+                    <!-- Outgoing Message (Right) -->
+                    <div class="flex justify-start">
+                        <div class="max-w-[80%] sm:max-w-md bg-blue-600 text-white rounded-2xl rounded-tr-none px-4 py-3 shadow-sm space-y-1">
+                            <p class="text-sm leading-relaxed whitespace-pre-wrap select-text">{{ msg.body }}</p>
+                            <div class="flex items-center justify-end space-x-1.5 space-x-reverse text-[10px] text-blue-100 pt-0.5">
+                                <span>{{ msg.created_at|date:"H:i" }}</span>
+                                {% if msg.is_read %}
+                                    <span title="خوانده شده" class="text-emerald-300 font-bold">✓✓</span>
+                                {% else %}
+                                    <span title="ارسال شده" class="text-blue-200">✓</span>
+                                {% endif %}
+                            </div>
+                        </div>
+                    </div>
+                {% else %}
+                    <!-- Incoming Message (Left) -->
+                    <div class="flex justify-end">
+                        <div class="max-w-[80%] sm:max-w-md bg-white border border-gray-200 text-gray-900 rounded-2xl rounded-tl-none px-4 py-3 shadow-sm space-y-1">
+                            <div class="text-[11px] font-bold text-gray-500 mb-0.5">
+                                {{ counterpart.first_name|default:counterpart.username }}
+                            </div>
+                            <p class="text-sm leading-relaxed whitespace-pre-wrap select-text text-gray-800">{{ msg.body }}</p>
+                            <div class="text-[10px] text-gray-400 text-left pt-0.5">
+                                <span>{{ msg.created_at|date:"H:i" }}</span>
+                            </div>
+                        </div>
+                    </div>
+                {% endif %}
+            {% endfor %}
+        {% else %}
+            <div class="h-full flex flex-col items-center justify-center text-center p-8 text-gray-400 space-y-2">
+                <svg class="w-12 h-12 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"></path>
+                </svg>
+                <p class="text-sm font-medium text-gray-600">آغاز گفتگوی جدید</p>
+                <p class="text-xs max-w-xs text-gray-400">
+                    پرسش‌ها، هماهنگی زمان تحویل و وضعیت کالا را در این گفتگو مطرح فرمایید.
+                </p>
+            </div>
+        {% endif %}
+    </div>
+
+    <!-- Message Input Footer -->
+    <div class="p-3 sm:p-4 bg-white border-t border-gray-200">
+        <form method="post" class="flex items-end gap-2" id="chat-form">
+            {% csrf_token %}
+            <div class="flex-grow">
+                {{ form.body }}
+                {% if form.body.errors %}
+                    <p class="text-xs text-red-600 mt-1">{{ form.body.errors.0 }}</p>
+                {% endif %}
+            </div>
+
+            <button type="submit" class="p-3 bg-blue-600 hover:bg-blue-700 text-white rounded-2xl shadow-sm transition flex-shrink-0 flex items-center justify-center" title="ارسال پیام">
+                <svg class="w-5 h-5 transform rotate-180" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8"></path>
+                </svg>
+            </button>
+        </form>
+    </div>
+</div>
+
+<script>
+    document.addEventListener("DOMContentLoaded", function() {
+        const container = document.getElementById("messages-container");
+        if (container) {
+            container.scrollTop = container.scrollHeight;
+        }
+    });
+</script>
+{% endblock %}
