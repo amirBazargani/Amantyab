@@ -53,12 +53,12 @@ Each app has its own `urls.py` with `app_name`; root `config/urls.py` includes t
   - Commits: `feat(core): add Leaflet map picker and viewer partials` · `feat(catalog): add pickup location to item form and detail`
   - Done notes: Created map_picker.html and map_view.html partials using Leaflet 1.9.4 and OpenStreetMap; embedded picker in item_form.html and viewer in item_detail.html; validated coordinates range (-90..90 and -180..180) and both-or-neither constraint in ItemForm.clean(); verified via 27 unit tests and live shell QA.
 
-- [ ] **P2-04B Item registration confirmation by email and SMS**
+- [x] **P2-04B Item registration confirmation by email and SMS**
   - Files: `catalog/views.py` (item_create).
   - Goal: after a NEW item is saved call `notify(owner, "item_registered", {"title": item.title}, item=item)`; editing an item does not notify.
   - Acceptance: creating an item prints email + SMS with the title and creates 2 NotificationLog rows linked to the item; edit sends nothing.
   - Commit: `feat(catalog): notify owner when an item is registered`
-  - Done notes:
+  - Done notes: Called core.notifications.notify upon successful item creation in item_create view; verified email and SMS console printout and 2 NotificationLog rows linked to item; verified item_edit does not send notifications via 29 catalog unit tests and live shell QA.
 
 - [ ] **P2-05 rentals: request, price, payment, receipt**
   - Files: `rentals/services.py` (calculate_price, has_overlap, create_rental, simulate_payment), `forms.py` (RentalRequestForm with clean() for dates/overlap/own item), views (rental_request, rental_pay, rental_receipt), templates.
