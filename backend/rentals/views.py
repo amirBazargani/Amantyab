@@ -4,12 +4,23 @@ from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.core.exceptions import PermissionDenied, ValidationError
 from django.shortcuts import get_object_or_404, redirect, render
+from django.views.decorators.http import require_POST
 from django.utils.translation import gettext_lazy as _
 
 from catalog.models import Item
 from .forms import RentalRequestForm
 from .models import Rental
-from .services import calculate_price, create_rental, has_overlap, simulate_payment
+from .services import (
+    calculate_price,
+    can_transition,
+    cancel_rental,
+    confirm_return_rental,
+    create_rental,
+    handover_rental,
+    has_overlap,
+    mark_returned_rental,
+    simulate_payment,
+)
 
 
 @login_required
@@ -133,3 +144,169 @@ def rental_receipt(request, pk):
         "is_renter": request.user.pk == rental.renter_id,
     }
     return render(request, "rentals/rental_receipt.html", context)
+
+
+@login_required
+def my_rentals(request):
+    """
+    List of rentals requested by the logged-in user as renter.
+    Optional filter by status query param.
+    """
+    rentals = Rental.objects.filter(renter=request.user).select_related(
+        "item", "item__owner"
+    ).order_by("-created_at")
+
+    selected_status = request.GET.get("status", "").strip()
+    if selected_status and selected_status in Rental.Status.values:
+        rentals = rentals.filter(status=selected_status)
+
+    context = {
+        "rentals": rentals,
+        "selected_status": selected_status,
+        "status_choices": Rental.Status.choices,
+    }
+    return render(request, "rentals/my_rentals.html", context)
+
+
+@login_required
+def owner_rentals(request):
+    """
+    List of rental requests for items owned by the logged-in user.
+    Optional filter by status query param.
+    """
+    rentals = Rental.objects.filter(item__owner=request.user).select_related(
+        "item", "renter"
+    ).order_by("-created_at")
+
+    selected_status = request.GET.get("status", "").strip()
+    if selected_status and selected_status in Rental.Status.values:
+        rentals = rentals.filter(status=selected_status)
+
+    context = {
+        "rentals": rentals,
+        "selected_status": selected_status,
+        "status_choices": Rental.Status.choices,
+    }
+    return render(request, "rentals/owner_rentals.html", context)
+
+
+@login_required
+def rental_detail(request, pk):
+    """
+    Detailed view of a rental for renter, owner, or staff.
+    Shows item info, delivery info, payments, status timeline,
+    and buttons for allowed lifecycle actions.
+    """
+    rental = get_object_or_404(
+        Rental.objects.select_related("item", "item__owner", "renter"),
+        pk=pk,
+    )
+
+    if request.user.pk not in (rental.renter_id, rental.item.owner_id) and not request.user.is_staff:
+        raise PermissionDenied(_("شما دسترسی به این سفارش را ندارید."))
+
+    payments = rental.payments.order_by("created_at")
+    total_paid = sum(p.amount for p in payments if p.status == p.Status.SUCCESS)
+
+    context = {
+        "rental": rental,
+        "item": rental.item,
+        "payments": payments,
+        "total_paid": total_paid,
+        "is_owner": request.user.pk == rental.item.owner_id,
+        "is_renter": request.user.pk == rental.renter_id,
+        "can_pay": rental.status == Rental.Status.PENDING_PAYMENT and (request.user.pk == rental.renter_id or request.user.is_staff),
+        "can_handover": can_transition(rental, Rental.Status.HANDED_OVER, request.user),
+        "can_mark_returned": can_transition(rental, Rental.Status.RETURNED, request.user),
+        "can_confirm_return": can_transition(rental, Rental.Status.COMPLETED, request.user),
+        "can_cancel": can_transition(rental, Rental.Status.CANCELLED, request.user),
+    }
+    return render(request, "rentals/rental_detail.html", context)
+
+
+@login_required
+@require_POST
+def handover(request, pk):
+    """
+    Action: Owner confirms handing over the item to renter.
+    Transitions from confirmed to handed_over.
+    """
+    rental = get_object_or_404(
+        Rental.objects.select_related("item", "item__owner", "renter"),
+        pk=pk,
+    )
+    try:
+        handover_rental(rental, request.user)
+        messages.success(request, _("تحویل کالا به مستأجر با موفقیت تأیید شد."))
+    except ValidationError as e:
+        messages.error(request, e.messages[0] if hasattr(e, "messages") else str(e))
+    except PermissionDenied as e:
+        messages.error(request, str(e))
+
+    return redirect("rentals:rental_detail", pk=rental.pk)
+
+
+@login_required
+@require_POST
+def mark_returned(request, pk):
+    """
+    Action: Renter declares the item has been returned.
+    Transitions from handed_over to returned.
+    """
+    rental = get_object_or_404(
+        Rental.objects.select_related("item", "item__owner", "renter"),
+        pk=pk,
+    )
+    try:
+        mark_returned_rental(rental, request.user)
+        messages.success(request, _("اعلام بازگرداندن کالا ثبت شد و در انتظار تأیید موجر است."))
+    except ValidationError as e:
+        messages.error(request, e.messages[0] if hasattr(e, "messages") else str(e))
+    except PermissionDenied as e:
+        messages.error(request, str(e))
+
+    return redirect("rentals:rental_detail", pk=rental.pk)
+
+
+@login_required
+@require_POST
+def confirm_return(request, pk):
+    """
+    Action: Owner confirms receipt of item and releases deposit.
+    Transitions from returned to completed, creates deposit_refund and payout payments.
+    """
+    rental = get_object_or_404(
+        Rental.objects.select_related("item", "item__owner", "renter"),
+        pk=pk,
+    )
+    try:
+        confirm_return_rental(rental, request.user)
+        messages.success(request, _("بازگشت کالا تأیید شد، ودیعه آزاد گردید و سفارش با موفقیت تکمیل شد."))
+    except ValidationError as e:
+        messages.error(request, e.messages[0] if hasattr(e, "messages") else str(e))
+    except PermissionDenied as e:
+        messages.error(request, str(e))
+
+    return redirect("rentals:rental_detail", pk=rental.pk)
+
+
+@login_required
+@require_POST
+def cancel(request, pk):
+    """
+    Action: Cancel rental before physical handover (pending_payment or confirmed).
+    """
+    rental = get_object_or_404(
+        Rental.objects.select_related("item", "item__owner", "renter"),
+        pk=pk,
+    )
+    try:
+        cancel_rental(rental, request.user)
+        messages.success(request, _("سفارش اجاره با موفقیت لغو شد."))
+    except ValidationError as e:
+        messages.error(request, e.messages[0] if hasattr(e, "messages") else str(e))
+    except PermissionDenied as e:
+        messages.error(request, str(e))
+
+    return redirect("rentals:rental_detail", pk=rental.pk)
+

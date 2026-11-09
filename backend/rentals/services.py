@@ -3,7 +3,7 @@ import uuid
 from decimal import Decimal, ROUND_HALF_UP
 from datetime import timedelta
 
-from django.core.exceptions import ValidationError
+from django.core.exceptions import PermissionDenied, ValidationError
 from django.db import transaction
 from django.utils import timezone
 from django.utils.translation import gettext_lazy as _
@@ -206,3 +206,222 @@ def simulate_payment(rental):
     rental.save(update_fields=["status", "tracking_code", "updated_at"])
 
     return rental, created_payments
+
+
+ALLOWED_TRANSITIONS = {
+    Rental.Status.PENDING_PAYMENT: [
+        Rental.Status.CONFIRMED,
+        Rental.Status.CANCELLED,
+    ],
+    Rental.Status.CONFIRMED: [
+        Rental.Status.HANDED_OVER,
+        Rental.Status.CANCELLED,
+    ],
+    Rental.Status.HANDED_OVER: [
+        Rental.Status.RETURNED,
+        Rental.Status.DISPUTED,
+    ],
+    Rental.Status.RETURNED: [
+        Rental.Status.COMPLETED,
+        Rental.Status.DISPUTED,
+    ],
+    Rental.Status.COMPLETED: [],
+    Rental.Status.CANCELLED: [],
+    Rental.Status.DISPUTED: [
+        Rental.Status.COMPLETED,
+    ],
+}
+
+
+def can_transition(rental, target_status, user):
+    """
+    Check whether `target_status` is a valid transition from `rental.status`
+    and whether `user` is authorized to perform it.
+    """
+    if target_status not in ALLOWED_TRANSITIONS.get(rental.status, []):
+        return False
+
+    if not user or not user.is_authenticated:
+        return False
+
+    # Staff/admin can perform any valid transition
+    if user.is_staff:
+        return True
+
+    # Check participant permissions per transition
+    if target_status == Rental.Status.CONFIRMED:
+        return user.pk == rental.renter_id
+
+    if target_status == Rental.Status.CANCELLED:
+        # Both renter and owner can cancel before handover
+        return user.pk in (rental.renter_id, rental.item.owner_id)
+
+    if target_status == Rental.Status.HANDED_OVER:
+        # Owner confirms handing over the item to renter
+        return user.pk == rental.item.owner_id
+
+    if target_status == Rental.Status.RETURNED:
+        # Renter marks item as returned
+        return user.pk == rental.renter_id
+
+    if target_status == Rental.Status.COMPLETED:
+        # Owner confirms receiving back the item in good order
+        return user.pk == rental.item.owner_id
+
+    if target_status == Rental.Status.DISPUTED:
+        # Either party can open a dispute
+        return user.pk in (rental.renter_id, rental.item.owner_id)
+
+    return False
+
+
+def get_available_transitions(rental, user):
+    """Return list of status values the user is allowed to transition the rental to."""
+    if not user or not user.is_authenticated:
+        return []
+    allowed = []
+    for next_status in ALLOWED_TRANSITIONS.get(rental.status, []):
+        if can_transition(rental, next_status, user):
+            allowed.append(next_status)
+    return allowed
+
+
+@transaction.atomic
+def handover_rental(rental, user):
+    """
+    Transition rental from confirmed to handed_over.
+    Only item owner (or staff) can perform this.
+    """
+    rental = Rental.objects.select_for_update().select_related("item").get(pk=rental.pk)
+
+    if rental.status != Rental.Status.CONFIRMED:
+        raise ValidationError(
+            _("تحویل کالا فقط برای سفارش‌های در وضعیت تایید شده امکان‌پذیر است.")
+        )
+
+    if not can_transition(rental, Rental.Status.HANDED_OVER, user):
+        raise PermissionDenied(
+            _("تنها مالک کالا مجاز به تایید تحویل کالا می‌باشد.")
+        )
+
+    rental.status = Rental.Status.HANDED_OVER
+    rental.save(update_fields=["status", "updated_at"])
+    return rental
+
+
+@transaction.atomic
+def mark_returned_rental(rental, user):
+    """
+    Transition rental from handed_over to returned.
+    Only renter (or staff) can perform this.
+    """
+    rental = Rental.objects.select_for_update().select_related("item").get(pk=rental.pk)
+
+    if rental.status != Rental.Status.HANDED_OVER:
+        raise ValidationError(
+            _("اعلام بازگشت کالا فقط برای سفارش‌های تحویل‌داده‌شده امکان‌پذیر است.")
+        )
+
+    if not can_transition(rental, Rental.Status.RETURNED, user):
+        raise PermissionDenied(
+            _("تنها مستأجر مجاز به اعلام بازگرداندن کالا می‌باشد.")
+        )
+
+    rental.status = Rental.Status.RETURNED
+    rental.save(update_fields=["status", "updated_at"])
+    return rental
+
+
+@transaction.atomic
+def confirm_return_rental(rental, user):
+    """
+    Transition rental from returned to completed.
+    Only item owner (or staff) can perform this.
+    Creates deposit_refund Payment (if deposit_amount > 0)
+    and payout Payment row for owner_payout.
+    """
+    rental = Rental.objects.select_for_update().select_related("item").get(pk=rental.pk)
+
+    if rental.status != Rental.Status.RETURNED:
+        raise ValidationError(
+            _("تایید بازگشت و پایان سفارش فقط برای سفارش‌های بازگردانده‌شده امکان‌پذیر است.")
+        )
+
+    if not can_transition(rental, Rental.Status.COMPLETED, user):
+        raise PermissionDenied(
+            _("تنها مالک کالا مجاز به تایید استرداد و تکمیل اجاره می‌باشد.")
+        )
+
+    # 1. Deposit refund payment (if deposit > 0)
+    if rental.deposit_amount > 0:
+        already_refunded = rental.payments.filter(
+            kind=Payment.Kind.DEPOSIT_REFUND,
+            status=Payment.Status.SUCCESS,
+        ).exists()
+        if not already_refunded:
+            Payment.objects.create(
+                rental=rental,
+                kind=Payment.Kind.DEPOSIT_REFUND,
+                amount=rental.deposit_amount,
+                status=Payment.Status.SUCCESS,
+                receipt_no=generate_receipt_no("dep_ref", rental.pk),
+            )
+
+    # 2. Payout to owner
+    if rental.owner_payout > 0:
+        already_paid_out = rental.payments.filter(
+            kind=Payment.Kind.PAYOUT,
+            status=Payment.Status.SUCCESS,
+        ).exists()
+        if not already_paid_out:
+            Payment.objects.create(
+                rental=rental,
+                kind=Payment.Kind.PAYOUT,
+                amount=rental.owner_payout,
+                status=Payment.Status.SUCCESS,
+                receipt_no=generate_receipt_no("payout", rental.pk),
+            )
+
+    rental.status = Rental.Status.COMPLETED
+    rental.save(update_fields=["status", "updated_at"])
+    return rental
+
+
+@transaction.atomic
+def cancel_rental(rental, user):
+    """
+    Cancel rental before handover (from pending_payment or confirmed).
+    Only renter, owner (or staff) can perform this.
+    If confirmed and deposit_amount > 0, refunds deposit.
+    """
+    rental = Rental.objects.select_for_update().select_related("item").get(pk=rental.pk)
+
+    if rental.status not in (Rental.Status.PENDING_PAYMENT, Rental.Status.CONFIRMED):
+        raise ValidationError(
+            _("امکان لغو سفارش پس از تحویل کالا وجود ندارد.")
+        )
+
+    if not can_transition(rental, Rental.Status.CANCELLED, user):
+        raise PermissionDenied(
+            _("شما دسترسی لازم برای لغو این سفارش را ندارید.")
+        )
+
+    # If already confirmed and deposit was collected, refund deposit
+    if rental.status == Rental.Status.CONFIRMED and rental.deposit_amount > 0:
+        already_refunded = rental.payments.filter(
+            kind=Payment.Kind.DEPOSIT_REFUND,
+            status=Payment.Status.SUCCESS,
+        ).exists()
+        if not already_refunded:
+            Payment.objects.create(
+                rental=rental,
+                kind=Payment.Kind.DEPOSIT_REFUND,
+                amount=rental.deposit_amount,
+                status=Payment.Status.SUCCESS,
+                receipt_no=generate_receipt_no("dep_ref", rental.pk),
+            )
+
+    rental.status = Rental.Status.CANCELLED
+    rental.save(update_fields=["status", "updated_at"])
+    return rental
+

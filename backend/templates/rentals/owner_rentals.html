@@ -1,0 +1,186 @@
+{% extends "base.html" %}
+
+{% block title %}درخواست‌های اجاره کالاهای من | امانت‌یاب{% endblock %}
+
+{% block content %}
+<div class="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-8">
+    <!-- Header -->
+    <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 bg-white p-6 rounded-2xl shadow-sm border border-gray-200">
+        <div class="flex items-center space-x-3 space-x-reverse">
+            <div class="p-3 bg-purple-50 text-purple-600 rounded-xl">
+                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"></path>
+                </svg>
+            </div>
+            <div>
+                <h1 class="text-2xl font-bold text-gray-900">درخواست‌های اجاره کالاهای من</h1>
+                <p class="text-xs text-gray-500 mt-1">پایش، تایید تحویل و تسویه نهایی سفارش‌های ثبت‌شده برای وسایل و ابزار شما</p>
+            </div>
+        </div>
+
+        <div>
+            <a href="{% url 'catalog:my_items' %}" class="inline-flex items-center space-x-1.5 space-x-reverse bg-gray-100 hover:bg-gray-200 text-gray-700 font-medium px-4 py-2 rounded-xl text-xs transition">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"></path>
+                </svg>
+                <span>مدیریت کالاهای من</span>
+            </a>
+        </div>
+    </div>
+
+    <!-- Status Filters -->
+    <div class="flex items-center space-x-2 space-x-reverse overflow-x-auto pb-2 text-xs">
+        <a href="{% url 'rentals:owner_rentals' %}" class="px-3 py-1.5 rounded-xl font-medium transition whitespace-nowrap {% if not selected_status %}bg-blue-600 text-white shadow-sm{% else %}bg-white text-gray-600 hover:bg-gray-100 border border-gray-200{% endif %}">
+            همه موارد
+        </a>
+        {% for st_val, st_label in status_choices %}
+            <a href="?status={{ st_val }}" class="px-3 py-1.5 rounded-xl font-medium transition whitespace-nowrap {% if selected_status == st_val %}bg-blue-600 text-white shadow-sm{% else %}bg-white text-gray-600 hover:bg-gray-100 border border-gray-200{% endif %}">
+                {{ st_label }}
+            </a>
+        {% endfor %}
+    </div>
+
+    <!-- Owner Rentals List -->
+    {% if rentals %}
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+            {% for rental in rentals %}
+                <div class="bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden flex flex-col justify-between hover:shadow-md transition">
+                    <div>
+                        <!-- Header with Item info & Status -->
+                        <div class="p-5 border-b border-gray-100 flex items-start justify-between gap-4">
+                            <div class="flex items-start space-x-3 space-x-reverse">
+                                <div class="w-16 h-16 rounded-xl bg-gray-100 overflow-hidden flex-shrink-0 border border-gray-200">
+                                    {% with rental.item.images.first as primary_img %}
+                                        {% if primary_img and primary_img.image %}
+                                            <img src="{{ primary_img.image.url }}" alt="{{ rental.item.title }}" class="w-full h-full object-cover">
+                                        {% else %}
+                                            <div class="w-full h-full flex items-center justify-center text-gray-400">
+                                                <svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"></path>
+                                                </svg>
+                                            </div>
+                                        {% endif %}
+                                    {% endwith %}
+                                </div>
+                                <div class="space-y-1">
+                                    <h3 class="font-bold text-gray-900 text-sm">
+                                        <a href="{% url 'rentals:rental_detail' rental.pk %}" class="hover:text-blue-600 transition">
+                                            {{ rental.item.title }}
+                                        </a>
+                                    </h3>
+                                    <div class="text-xs text-gray-500">
+                                        <span>مستأجر: {{ rental.renter.get_full_name|default:rental.renter.username }}</span>
+                                        <span>•</span>
+                                        <span>تلفن: {{ rental.renter.phone|default:"-" }}</span>
+                                    </div>
+                                    {% if rental.tracking_code %}
+                                        <div class="text-[11px] font-mono text-blue-600 font-semibold">
+                                            کد رهگیری: {{ rental.tracking_code }}
+                                        </div>
+                                    {% endif %}
+                                </div>
+                            </div>
+
+                            <div>
+                                {% if rental.status == 'pending_payment' %}
+                                    <span class="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-bold bg-amber-100 text-amber-800 border border-amber-200">
+                                        {{ rental.get_status_display }}
+                                    </span>
+                                {% elif rental.status == 'confirmed' %}
+                                    <span class="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-bold bg-blue-100 text-blue-800 border border-blue-200">
+                                        {{ rental.get_status_display }}
+                                    </span>
+                                {% elif rental.status == 'handed_over' %}
+                                    <span class="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-bold bg-purple-100 text-purple-800 border border-purple-200">
+                                        {{ rental.get_status_display }}
+                                    </span>
+                                {% elif rental.status == 'returned' %}
+                                    <span class="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-bold bg-teal-100 text-teal-800 border border-teal-200">
+                                        {{ rental.get_status_display }}
+                                    </span>
+                                {% elif rental.status == 'completed' %}
+                                    <span class="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-bold bg-emerald-100 text-emerald-800 border border-emerald-200">
+                                        {{ rental.get_status_display }}
+                                    </span>
+                                {% elif rental.status == 'cancelled' %}
+                                    <span class="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-bold bg-gray-100 text-gray-800 border border-gray-200">
+                                        {{ rental.get_status_display }}
+                                    </span>
+                                {% else %}
+                                    <span class="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-bold bg-rose-100 text-rose-800 border border-rose-200">
+                                        {{ rental.get_status_display }}
+                                    </span>
+                                {% endif %}
+                            </div>
+                        </div>
+
+                        <!-- Details Body -->
+                        <div class="p-5 space-y-3 text-xs text-gray-600 bg-gray-50/50">
+                            <div class="flex items-center justify-between">
+                                <span class="text-gray-500">بازه زمانی اجاره:</span>
+                                <span class="font-medium text-gray-800">{{ rental.start_at|date:"Y/m/d H:i" }} تا {{ rental.end_at|date:"Y/m/d H:i" }}</span>
+                            </div>
+                            <div class="flex items-center justify-between">
+                                <span class="text-gray-500">روش دریافت:</span>
+                                <span class="font-medium text-gray-800">{{ rental.get_delivery_method_display }}</span>
+                            </div>
+                            <div class="flex items-center justify-between">
+                                <span class="text-gray-500">کل کرایه دریافتی:</span>
+                                <span class="text-gray-800">{{ rental.rent_amount|floatformat:0 }} تومان</span>
+                            </div>
+                            <div class="flex items-center justify-between">
+                                <span class="text-emerald-700 font-semibold">سهم خالص شما (پس از کسر کارمزد):</span>
+                                <span class="font-bold text-emerald-700 text-sm">{{ rental.owner_payout|floatformat:0 }} تومان</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Footer Actions -->
+                    <div class="p-4 bg-white border-t border-gray-100 flex items-center justify-between gap-2">
+                        <a href="{% url 'rentals:rental_detail' rental.pk %}" class="inline-flex items-center space-x-1 space-x-reverse text-blue-600 hover:text-blue-700 font-medium text-xs">
+                            <span>مدیریت کامل سفارش</span>
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"></path>
+                            </svg>
+                        </a>
+
+                        <div class="flex items-center gap-2">
+                            {% if rental.status == 'confirmed' %}
+                                <form action="{% url 'rentals:handover' rental.pk %}" method="post" onsubmit="return confirm('آیا تحویل کالا به مستأجر را تایید می‌کنید؟');">
+                                    {% csrf_token %}
+                                    <button type="submit" class="bg-purple-600 hover:bg-purple-700 text-white font-medium px-3 py-1.5 rounded-xl text-xs transition">
+                                        تأیید تحویل به مستأجر
+                                    </button>
+                                </form>
+                            {% elif rental.status == 'returned' %}
+                                <form action="{% url 'rentals:confirm_return' rental.pk %}" method="post" onsubmit="return confirm('آیا سلامت کالا و آزادسازی ودیعه را تایید می‌کنید؟');">
+                                    {% csrf_token %}
+                                    <button type="submit" class="bg-emerald-600 hover:bg-emerald-700 text-white font-medium px-3 py-1.5 rounded-xl text-xs transition">
+                                        تأیید بازگشت و تسویه
+                                    </button>
+                                </form>
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+            {% endfor %}
+        </div>
+    {% else %}
+        <div class="bg-white rounded-2xl border border-dashed border-gray-300 p-12 text-center space-y-4">
+            <div class="w-16 h-16 bg-purple-50 text-purple-500 rounded-full flex items-center justify-center mx-auto">
+                <svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z"></path>
+                </svg>
+            </div>
+            <h3 class="font-bold text-gray-800 text-base">درخواستی یافت نشد</h3>
+            <p class="text-xs text-gray-500 max-w-md mx-auto">
+                {% if selected_status %}
+                    هیچ سفارشی با وضعیت انتخاب شده وجود ندارد.
+                {% else %}
+                    در حال حاضر درخواستی برای امانت کالاهای شما ثبت نشده است. با فعال نگه داشتن کالاهایتان و درج اطلاعات کامل، همسایگان زودتر به شما پیام خواهند داد.
+                {% endif %}
+            </p>
+        </div>
+    {% endif %}
+</div>
+{% endblock %}

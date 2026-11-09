@@ -6,6 +6,8 @@
 {% url 'catalog:item_list' as item_list_url %}
 {% url 'catalog:my_items' as my_items_url %}
 {% url 'catalog:item_create' as item_create_url %}
+{% url 'rentals:my_rentals' as my_rentals_url %}
+{% url 'rentals:owner_rentals' as owner_rentals_url %}
 
 <nav class="bg-white border-b border-gray-200 sticky top-0 z-50">
     <div class="container mx-auto px-4">
@@ -24,6 +26,8 @@
                     <a href="{{ item_list_url|default:'/catalog/' }}" class="hover:text-blue-600 transition px-2 py-1">کالاها</a>
                     {% if request.user.is_authenticated %}
                         <a href="{{ my_items_url|default:'/catalog/my-items/' }}" class="hover:text-blue-600 transition px-2 py-1">کالاهای من</a>
+                        <a href="{{ my_rentals_url|default:'/rentals/my-rentals/' }}" class="hover:text-blue-600 transition px-2 py-1">امانت‌های من</a>
+                        <a href="{{ owner_rentals_url|default:'/rentals/owner-rentals/' }}" class="hover:text-blue-600 transition px-2 py-1">درخواست‌های دریافتی</a>
                         <a href="{{ item_create_url|default:'/catalog/new/' }}" class="hover:text-blue-600 transition px-2 py-1">ثبت کالا</a>
                     {% endif %}
                 </div>
@@ -77,6 +81,8 @@
             <a href="{{ item_list_url|default:'/catalog/' }}" class="block px-3 py-2 rounded-md text-base font-medium text-gray-700 hover:bg-gray-100">کالاها</a>
             {% if request.user.is_authenticated %}
                 <a href="{{ my_items_url|default:'/catalog/my-items/' }}" class="block px-3 py-2 rounded-md text-base font-medium text-gray-700 hover:bg-gray-100">کالاهای من</a>
+                <a href="{{ my_rentals_url|default:'/rentals/my-rentals/' }}" class="block px-3 py-2 rounded-md text-base font-medium text-gray-700 hover:bg-gray-100">امانت‌های من</a>
+                <a href="{{ owner_rentals_url|default:'/rentals/owner-rentals/' }}" class="block px-3 py-2 rounded-md text-base font-medium text-gray-700 hover:bg-gray-100">درخواست‌های دریافتی</a>
                 <a href="{{ item_create_url|default:'/catalog/new/' }}" class="block px-3 py-2 rounded-md text-base font-medium text-gray-700 hover:bg-gray-100">ثبت کالا</a>
                 <a href="{{ profile_url|default:'/accounts/profile/' }}" class="block px-3 py-2 rounded-md text-base font-medium text-gray-700 hover:bg-gray-100">پروفایل کاربری ({{ request.user.first_name|default:request.user.phone }})</a>
                 {% if request.user.is_staff %}
