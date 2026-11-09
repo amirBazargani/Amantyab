@@ -1,4 +1,5 @@
-{% if item.latitude and item.longitude %}
+{% with lat=map_lat|default:item.latitude lng=map_lng|default:item.longitude address=map_address|default:item.address_text title=map_title|default:"موقعیت مکانی تحویل حضوری (روی نقشه)" popup=map_popup|default:"محل تحویل حضوری کالا" container_id=map_container_id|default:"map-viewer" %}
+{% if lat and lng %}
     <!-- Leaflet CDN -->
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="" />
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
@@ -9,52 +10,62 @@
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"></path>
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"></path>
             </svg>
-            <span>موقعیت مکانی تحویل حضوری (روی نقشه)</span>
+            <span>{{ title }}</span>
         </div>
 
         <div class="relative w-full rounded-xl overflow-hidden border border-gray-200 shadow-sm" style="height: 250px; z-index: 10;">
-            <div id="map-viewer" class="w-full h-full" style="z-index: 1;"></div>
+            <div id="{{ container_id }}" class="w-full h-full" style="z-index: 1;"></div>
         </div>
 
-        {% if item.address_text %}
+        {% if address %}
             <p class="text-xs text-gray-600 flex items-center space-x-1 space-x-reverse pt-1">
                 <span class="text-gray-400">نشانی محل تحویل:</span>
-                <span class="font-medium text-gray-800">{{ item.address_text }}</span>
+                <span class="font-medium text-gray-800">{{ address }}</span>
             </p>
         {% endif %}
     </div>
 
     <script>
-        document.addEventListener("DOMContentLoaded", function () {
-            const lat = {{ item.latitude }};
-            const lng = {{ item.longitude }};
+        (function () {
+            function initViewer() {
+                const lat = {{ lat }};
+                const lng = {{ lng }};
+                const container = document.getElementById("{{ container_id }}");
 
-            if (isNaN(lat) || isNaN(lng)) return;
+                if (isNaN(lat) || isNaN(lng) || !container) return;
 
-            const map = L.map("map-viewer", {
-                attributionControl: false,
-                dragging: !L.Browser.mobile,
-                tap: !L.Browser.mobile
-            }).setView([lat, lng], 15);
+                const map = L.map("{{ container_id }}", {
+                    attributionControl: false,
+                    dragging: !L.Browser.mobile,
+                    tap: !L.Browser.mobile
+                }).setView([lat, lng], 15);
 
-            L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
-                maxZoom: 19
-            }).addTo(map);
+                L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+                    maxZoom: 19
+                }).addTo(map);
 
-            const marker = L.marker([lat, lng]).addTo(map);
-            marker.bindPopup("<div class='text-right font-sans text-xs font-bold p-1'>محل تحویل حضوری کالا</div>").openPopup();
+                const marker = L.marker([lat, lng]).addTo(map);
+                marker.bindPopup("<div class='text-right font-sans text-xs font-bold p-1'>{{ popup }}</div>").openPopup();
 
-            setTimeout(function () {
-                map.invalidateSize();
-            }, 250);
-        });
+                setTimeout(function () {
+                    map.invalidateSize();
+                }, 250);
+            }
+
+            if (document.readyState === "loading") {
+                document.addEventListener("DOMContentLoaded", initViewer);
+            } else {
+                initViewer();
+            }
+        })();
     </script>
-{% elif item.address_text %}
-    <!-- Item without coordinates shows only the address text and no map -->
+{% elif address %}
+    <!-- Item/Rental without coordinates shows only the address text and no map -->
     <div class="space-y-1">
-        <span class="block text-xs font-semibold text-gray-500">نشانی محل تحویل حضوری:</span>
+        <span class="block text-xs font-semibold text-gray-500">نشانی محل تحویل:</span>
         <p class="text-xs text-gray-800 font-medium bg-gray-50 p-2.5 rounded-lg border border-gray-200">
-            {{ item.address_text }}
+            {{ address }}
         </p>
     </div>
 {% endif %}
+{% endwith %}

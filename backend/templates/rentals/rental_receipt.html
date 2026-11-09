@@ -57,6 +57,16 @@
                 </div>
             </div>
 
+            <!-- Handover Location Map -->
+            <div class="space-y-3 pb-6 border-b border-gray-100">
+                <h3 class="font-bold text-gray-900 text-sm">نقشه و موقعیت مکانی تحویل</h3>
+                {% if rental.delivery_method == 'pickup' %}
+                    {% include "partials/map_view.html" with map_lat=item.latitude map_lng=item.longitude map_address=item.address_text map_title="موقعیت مکانی تحویل حضوری کالا (محل مالک)" map_popup="محل تحویل حضوری کالا" map_container_id="receipt-map-viewer" %}
+                {% elif rental.delivery_method == 'courier' %}
+                    {% include "partials/map_view.html" with map_lat=rental.delivery_latitude map_lng=rental.delivery_longitude map_address=rental.delivery_address map_title="موقعیت مکانی تحویل با پیک (مقصد متقاضی)" map_popup="نشانی تحویل پیک" map_container_id="receipt-map-viewer" %}
+                {% endif %}
+            </div>
+
             <!-- Payment Transactions Table -->
             <div class="space-y-3">
                 <h3 class="font-bold text-gray-900 text-sm">تراکنش‌های پرداخت ثبت‌شده</h3>

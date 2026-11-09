@@ -642,3 +642,180 @@ class RentalViewsTestCase(TestCase):
         self.client.force_login(self.renter)
         resp = self.client.get(receipt_url)
         self.assertEqual(resp.status_code, 200)
+
+
+class HandoverLocationMapTestCase(TestCase):
+    def setUp(self):
+        self.owner = User.objects.create_user(
+            username="mapowner",
+            email="mapowner@test.com",
+            password="StrongPassword123!",
+            phone="09121111118",
+        )
+        self.renter = User.objects.create_user(
+            username="maprenter",
+            email="maprenter@test.com",
+            password="StrongPassword123!",
+            phone="09122222230",
+        )
+        self.category = Category.objects.create(name="لوازم سفر", slug="travel-gear")
+        self.item_with_coords = Item.objects.create(
+            owner=self.owner,
+            category=self.category,
+            title="کوله پشتی کوهنوردی ۶۵ لیتری",
+            description="مناسب صعودهای سنگین",
+            condition=Item.Condition.NEW,
+            daily_price=Decimal("90000"),
+            city="تهران",
+            neighborhood="ونک",
+            allow_pickup=True,
+            allow_courier=True,
+            latitude=Decimal("35.755000"),
+            longitude=Decimal("51.405000"),
+            address_text="میدان ونک، خیابان ملاصدرا",
+        )
+        self.item_no_coords = Item.objects.create(
+            owner=self.owner,
+            category=self.category,
+            title="فلاسک استیل مسافرتی",
+            description="نگهداری ۲۴ ساعته دمای آب",
+            condition=Item.Condition.GOOD,
+            daily_price=Decimal("40000"),
+            city="تهران",
+            neighborhood="پونک",
+            allow_pickup=True,
+            allow_courier=True,
+            latitude=None,
+            longitude=None,
+            address_text="پونک، میدان عدل",
+        )
+        self.client = Client()
+
+    def test_form_courier_with_coordinates_valid(self):
+        """Courier delivery with address and valid coordinates passes form validation."""
+        start = timezone.now() + timedelta(days=1)
+        end = start + timedelta(days=2)
+        data = {
+            "start_at": start.strftime("%Y-%m-%dT%H:%M"),
+            "end_at": end.strftime("%Y-%m-%dT%H:%M"),
+            "delivery_method": Rental.DeliveryMethod.COURIER,
+            "delivery_address": "تهران، خیابان آزادی، دانشگاه صنعتی شریف",
+            "delivery_latitude": "35.702500",
+            "delivery_longitude": "51.352100",
+        }
+        form = RentalRequestForm(data=data, item=self.item_with_coords, user=self.renter)
+        self.assertTrue(form.is_valid(), form.errors)
+        self.assertEqual(form.cleaned_data["delivery_latitude"], Decimal("35.702500"))
+        self.assertEqual(form.cleaned_data["delivery_longitude"], Decimal("51.352100"))
+
+    def test_form_courier_both_or_neither_lat_lng_validation(self):
+        """Submitting only latitude without longitude fails both-or-neither constraint."""
+        start = timezone.now() + timedelta(days=1)
+        end = start + timedelta(days=2)
+        data = {
+            "start_at": start.strftime("%Y-%m-%dT%H:%M"),
+            "end_at": end.strftime("%Y-%m-%dT%H:%M"),
+            "delivery_method": Rental.DeliveryMethod.COURIER,
+            "delivery_address": "تهران، خیابان آزادی",
+            "delivery_latitude": "35.702500",
+            "delivery_longitude": "",
+        }
+        form = RentalRequestForm(data=data, item=self.item_with_coords, user=self.renter)
+        self.assertFalse(form.is_valid())
+        self.assertIn("مختصات جغرافیایی تحویل باید هر دو مشخص شوند یا هر دو خالی باشند.", form.non_field_errors())
+
+    def test_form_courier_out_of_bounds_coordinates(self):
+        """Latitude > 90 or longitude > 180 is rejected."""
+        start = timezone.now() + timedelta(days=1)
+        end = start + timedelta(days=2)
+        data = {
+            "start_at": start.strftime("%Y-%m-%dT%H:%M"),
+            "end_at": end.strftime("%Y-%m-%dT%H:%M"),
+            "delivery_method": Rental.DeliveryMethod.COURIER,
+            "delivery_address": "تهران، خیابان آزادی",
+            "delivery_latitude": "95.000000",
+            "delivery_longitude": "200.000000",
+        }
+        form = RentalRequestForm(data=data, item=self.item_with_coords, user=self.renter)
+        self.assertFalse(form.is_valid())
+        self.assertIn("delivery_latitude", form.errors)
+        self.assertIn("delivery_longitude", form.errors)
+
+    def test_form_pickup_clears_coordinates(self):
+        """When delivery_method is pickup, any courier coordinates are cleared."""
+        start = timezone.now() + timedelta(days=1)
+        end = start + timedelta(days=2)
+        data = {
+            "start_at": start.strftime("%Y-%m-%dT%H:%M"),
+            "end_at": end.strftime("%Y-%m-%dT%H:%M"),
+            "delivery_method": Rental.DeliveryMethod.PICKUP,
+            "delivery_address": "",
+            "delivery_latitude": "35.702500",
+            "delivery_longitude": "51.352100",
+        }
+        form = RentalRequestForm(data=data, item=self.item_with_coords, user=self.renter)
+        self.assertTrue(form.is_valid(), form.errors)
+        self.assertIsNone(form.cleaned_data["delivery_latitude"])
+        self.assertIsNone(form.cleaned_data["delivery_longitude"])
+
+    def test_receipt_shows_pickup_map_for_item_with_coords(self):
+        """Pickup rental displays item's pickup location map on receipt."""
+        start = timezone.now() + timedelta(days=1)
+        end = start + timedelta(days=2)
+        rental = create_rental(
+            renter=self.renter,
+            item=self.item_with_coords,
+            start_at=start,
+            end_at=end,
+            delivery_method=Rental.DeliveryMethod.PICKUP,
+        )
+        simulate_payment(rental)
+
+        self.client.force_login(self.renter)
+        resp = self.client.get(reverse("rentals:rental_receipt", kwargs={"pk": rental.pk}))
+        self.assertEqual(resp.status_code, 200)
+        self.assertContains(resp, "receipt-map-viewer")
+        self.assertContains(resp, "موقعیت مکانی تحویل حضوری کالا (محل مالک)")
+        self.assertContains(resp, "میدان ونک، خیابان ملاصدرا")
+
+    def test_receipt_shows_courier_map_for_rental_with_coords(self):
+        """Courier rental displays renter's delivery location map on receipt."""
+        start = timezone.now() + timedelta(days=1)
+        end = start + timedelta(days=2)
+        rental = create_rental(
+            renter=self.renter,
+            item=self.item_no_coords,
+            start_at=start,
+            end_at=end,
+            delivery_method=Rental.DeliveryMethod.COURIER,
+            delivery_address="خیابان ستارخان، کوچه مهدی",
+            delivery_latitude=Decimal("35.715000"),
+            delivery_longitude=Decimal("51.365000"),
+        )
+        simulate_payment(rental)
+
+        self.client.force_login(self.renter)
+        resp = self.client.get(reverse("rentals:rental_receipt", kwargs={"pk": rental.pk}))
+        self.assertEqual(resp.status_code, 200)
+        self.assertContains(resp, "receipt-map-viewer")
+        self.assertContains(resp, "موقعیت مکانی تحویل با پیک (مقصد متقاضی)")
+        self.assertContains(resp, "خیابان ستارخان، کوچه مهدی")
+
+    def test_receipt_shows_no_map_when_no_coords(self):
+        """Rental with no coordinates shows address text but no map container."""
+        start = timezone.now() + timedelta(days=1)
+        end = start + timedelta(days=2)
+        rental = create_rental(
+            renter=self.renter,
+            item=self.item_no_coords,
+            start_at=start,
+            end_at=end,
+            delivery_method=Rental.DeliveryMethod.PICKUP,
+        )
+        simulate_payment(rental)
+
+        self.client.force_login(self.renter)
+        resp = self.client.get(reverse("rentals:rental_receipt", kwargs={"pk": rental.pk}))
+        self.assertEqual(resp.status_code, 200)
+        self.assertNotContains(resp, "receipt-map-viewer")
+        self.assertContains(resp, "پونک، میدان عدل")

@@ -39,6 +39,8 @@ def rental_request(request, item_id):
                     end_at=form.cleaned_data["end_at"],
                     delivery_method=form.cleaned_data["delivery_method"],
                     delivery_address=form.cleaned_data.get("delivery_address", ""),
+                    delivery_latitude=form.cleaned_data.get("delivery_latitude"),
+                    delivery_longitude=form.cleaned_data.get("delivery_longitude"),
                 )
                 messages.success(
                     request,
