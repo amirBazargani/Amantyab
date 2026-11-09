@@ -59,6 +59,18 @@ class RentalRequestForm(forms.ModelForm):
             }
         ),
     )
+    delivery_latitude = forms.DecimalField(
+        required=False,
+        max_digits=9,
+        decimal_places=6,
+        widget=forms.HiddenInput(attrs={"id": "id_delivery_latitude"}),
+    )
+    delivery_longitude = forms.DecimalField(
+        required=False,
+        max_digits=9,
+        decimal_places=6,
+        widget=forms.HiddenInput(attrs={"id": "id_delivery_longitude"}),
+    )
 
     class Meta:
         model = Rental
@@ -67,6 +79,8 @@ class RentalRequestForm(forms.ModelForm):
             "end_at",
             "delivery_method",
             "delivery_address",
+            "delivery_latitude",
+            "delivery_longitude",
         ]
 
     def __init__(self, *args, item=None, user=None, **kwargs):
@@ -94,6 +108,8 @@ class RentalRequestForm(forms.ModelForm):
         end_at = cleaned_data.get("end_at")
         delivery_method = cleaned_data.get("delivery_method")
         delivery_address = cleaned_data.get("delivery_address", "").strip()
+        delivery_latitude = cleaned_data.get("delivery_latitude")
+        delivery_longitude = cleaned_data.get("delivery_longitude")
 
         # 1. Check ownership
         if self.user and self.item and self.user.pk == self.item.owner_id:
@@ -123,11 +139,40 @@ class RentalRequestForm(forms.ModelForm):
                         _("این کالا در بازه زمانی انتخابی قبلاً رزرو شده است. لطفاً تاریخ دیگری انتخاب کنید.")
                     )
 
-        # 4. Courier address requirement
-        if delivery_method == Rental.DeliveryMethod.COURIER and not delivery_address:
-            self.add_error(
-                "delivery_address",
-                _("برای شیوه ارسال با پیک، وارد کردن نشانی تحویل الزامی است."),
+        # 4. Courier address and coordinates
+        if delivery_method == Rental.DeliveryMethod.COURIER:
+            if not delivery_address:
+                self.add_error(
+                    "delivery_address",
+                    _("برای شیوه ارسال با پیک، وارد کردن نشانی تحویل الزامی است."),
+                )
+        else:
+            # In pickup mode, delivery coordinates and address do not apply
+            cleaned_data["delivery_latitude"] = None
+            cleaned_data["delivery_longitude"] = None
+            delivery_latitude = None
+            delivery_longitude = None
+
+        # 5. Geographic validation (both-or-neither and ranges)
+        if (delivery_latitude is None and delivery_longitude is not None) or (
+            delivery_latitude is not None and delivery_longitude is None
+        ):
+            raise ValidationError(
+                _("مختصات جغرافیایی تحویل باید هر دو مشخص شوند یا هر دو خالی باشند.")
             )
+
+        if delivery_latitude is not None:
+            if delivery_latitude < Decimal("-90") or delivery_latitude > Decimal("90"):
+                self.add_error(
+                    "delivery_latitude",
+                    _("عرض جغرافیایی باید بین ۹۰- تا ۹۰ درجه باشد."),
+                )
+
+        if delivery_longitude is not None:
+            if delivery_longitude < Decimal("-180") or delivery_longitude > Decimal("180"):
+                self.add_error(
+                    "delivery_longitude",
+                    _("طول جغرافیایی باید بین ۱۸۰- تا ۱۸۰ درجه باشد."),
+                )
 
         return cleaned_data

@@ -2,111 +2,128 @@
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="" />
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
 
+{% with container_id=picker_container_id|default:"map-picker" lat_id=picker_lat_id|default:"id_latitude" lng_id=picker_lng_id|default:"id_longitude" title=picker_title|default:"انتخاب موقعیت تحویل حضوری روی نقشه (اختیاری):" clear_btn_id=picker_clear_btn_id|default:"clear-map-picker-btn" status_id=picker_status_id|default:"coords-status" %}
 <div class="space-y-2">
     <div class="flex items-center justify-between">
         <label class="block text-xs font-semibold text-gray-700">
-            انتخاب موقعیت تحویل حضوری روی نقشه (اختیاری):
+            {{ title }}
         </label>
-        <button type="button" id="clear-map-picker-btn" class="text-xs text-red-600 hover:text-red-700 hover:underline font-medium hidden">
+        <button type="button" id="{{ clear_btn_id }}" class="text-xs text-red-600 hover:text-red-700 hover:underline font-medium hidden">
             پاک کردن موقعیت از نقشه
         </button>
     </div>
 
     <!-- Map container -->
     <div class="relative w-full rounded-xl overflow-hidden border border-gray-300 shadow-sm" style="height: 280px; z-index: 10;">
-        <div id="map-picker" class="w-full h-full" style="z-index: 1;"></div>
+        <div id="{{ container_id }}" class="w-full h-full" style="z-index: 1;"></div>
     </div>
 
     <div class="flex items-center justify-between text-[11px] text-gray-500">
         <span>💡 برای ثبت محل تحویل، روی نقشه کلیک کنید یا نشانگر را بکشید.</span>
-        <span id="coords-status" class="font-mono text-gray-700 bg-gray-100 px-2 py-0.5 rounded border border-gray-200">
+        <span id="{{ status_id }}" class="font-mono text-gray-700 bg-gray-100 px-2 py-0.5 rounded border border-gray-200">
             نقطه‌ای انتخاب نشده
         </span>
     </div>
 </div>
 
 <script>
-    document.addEventListener("DOMContentLoaded", function () {
-        const latInput = document.getElementById("id_latitude");
-        const lngInput = document.getElementById("id_longitude");
-        const statusSpan = document.getElementById("coords-status");
-        const clearBtn = document.getElementById("clear-map-picker-btn");
+    (function () {
+        function initMap() {
+            const latInput = document.getElementById("{{ lat_id }}");
+            const lngInput = document.getElementById("{{ lng_id }}");
+            const statusSpan = document.getElementById("{{ status_id }}");
+            const clearBtn = document.getElementById("{{ clear_btn_id }}");
+            const container = document.getElementById("{{ container_id }}");
 
-        if (!latInput || !lngInput) return;
+            if (!latInput || !lngInput || !container) return;
 
-        // Default: Tehran coordinates
-        const defaultLat = 35.6892;
-        const defaultLng = 51.3890;
-        const defaultZoom = 12;
+            // Default: Tehran coordinates
+            const defaultLat = 35.6892;
+            const defaultLng = 51.3890;
+            const defaultZoom = 12;
 
-        let initialLat = parseFloat(latInput.value);
-        let initialLng = parseFloat(lngInput.value);
-        const hasInitial = !isNaN(initialLat) && !isNaN(initialLng);
+            let initialLat = parseFloat(latInput.value);
+            let initialLng = parseFloat(lngInput.value);
+            const hasInitial = !isNaN(initialLat) && !isNaN(initialLng);
 
-        const centerLat = hasInitial ? initialLat : defaultLat;
-        const centerLng = hasInitial ? initialLng : defaultLng;
-        const zoomLevel = hasInitial ? 15 : defaultZoom;
+            const centerLat = hasInitial ? initialLat : defaultLat;
+            const centerLng = hasInitial ? initialLng : defaultLng;
+            const zoomLevel = hasInitial ? 15 : defaultZoom;
 
-        const map = L.map("map-picker", {
-            attributionControl: false
-        }).setView([centerLat, centerLng], zoomLevel);
+            const map = L.map("{{ container_id }}", {
+                attributionControl: false
+            }).setView([centerLat, centerLng], zoomLevel);
 
-        L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
-            maxZoom: 19
-        }).addTo(map);
+            L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+                maxZoom: 19
+            }).addTo(map);
 
-        let marker = null;
+            let marker = null;
 
-        function updateInputs(lat, lng) {
-            latInput.value = lat.toFixed(6);
-            lngInput.value = lng.toFixed(6);
-            statusSpan.textContent = `${lat.toFixed(4)}, ${lng.toFixed(4)}`;
-            statusSpan.className = "font-mono text-blue-700 bg-blue-50 px-2 py-0.5 rounded border border-blue-200";
-            if (clearBtn) clearBtn.classList.remove("hidden");
-        }
-
-        function clearCoordinates() {
-            if (marker) {
-                map.removeLayer(marker);
-                marker = null;
+            function updateInputs(lat, lng) {
+                latInput.value = lat.toFixed(6);
+                lngInput.value = lng.toFixed(6);
+                statusSpan.textContent = `${lat.toFixed(4)}, ${lng.toFixed(4)}`;
+                statusSpan.className = "font-mono text-blue-700 bg-blue-50 px-2 py-0.5 rounded border border-blue-200";
+                if (clearBtn) clearBtn.classList.remove("hidden");
             }
-            latInput.value = "";
-            lngInput.value = "";
-            statusSpan.textContent = "نقطه‌ای انتخاب نشده";
-            statusSpan.className = "font-mono text-gray-700 bg-gray-100 px-2 py-0.5 rounded border border-gray-200";
-            if (clearBtn) clearBtn.classList.add("hidden");
-        }
 
-        function setOrMoveMarker(lat, lng) {
-            if (!marker) {
-                marker = L.marker([lat, lng], { draggable: true }).addTo(map);
-                marker.on("dragend", function (e) {
-                    const pos = e.target.getLatLng();
-                    updateInputs(pos.lat, pos.lng);
-                });
-            } else {
-                marker.setLatLng([lat, lng]);
+            function clearCoordinates() {
+                if (marker) {
+                    map.removeLayer(marker);
+                    marker = null;
+                }
+                latInput.value = "";
+                lngInput.value = "";
+                statusSpan.textContent = "نقطه‌ای انتخاب نشده";
+                statusSpan.className = "font-mono text-gray-700 bg-gray-100 px-2 py-0.5 rounded border border-gray-200";
+                if (clearBtn) clearBtn.classList.add("hidden");
             }
-            updateInputs(lat, lng);
-        }
 
-        if (hasInitial) {
-            setOrMoveMarker(initialLat, initialLng);
-        }
+            function setOrMoveMarker(lat, lng) {
+                if (!marker) {
+                    marker = L.marker([lat, lng], { draggable: true }).addTo(map);
+                    marker.on("dragend", function (e) {
+                        const pos = e.target.getLatLng();
+                        updateInputs(pos.lat, pos.lng);
+                    });
+                } else {
+                    marker.setLatLng([lat, lng]);
+                }
+                updateInputs(lat, lng);
+            }
 
-        map.on("click", function (e) {
-            setOrMoveMarker(e.latlng.lat, e.latlng.lng);
-        });
+            if (hasInitial) {
+                setOrMoveMarker(initialLat, initialLng);
+            }
 
-        if (clearBtn) {
-            clearBtn.addEventListener("click", function () {
-                clearCoordinates();
+            map.on("click", function (e) {
+                setOrMoveMarker(e.latlng.lat, e.latlng.lng);
             });
+
+            if (clearBtn) {
+                clearBtn.addEventListener("click", function () {
+                    clearCoordinates();
+                });
+            }
+
+            // Expose map resize handler for tab/toggle switching
+            window["invalidatePicker_{{ container_id }}"] = function () {
+                setTimeout(function () {
+                    map.invalidateSize();
+                }, 100);
+            };
+
+            setTimeout(function () {
+                map.invalidateSize();
+            }, 250);
         }
 
-        // Handle sizing after render
-        setTimeout(function () {
-            map.invalidateSize();
-        }, 200);
-    });
+        if (document.readyState === "loading") {
+            document.addEventListener("DOMContentLoaded", initMap);
+        } else {
+            initMap();
+        }
+    })();
 </script>
+{% endwith %}

@@ -66,12 +66,12 @@ Each app has its own `urls.py` with `app_name`; root `config/urls.py` includes t
   - Commits: `feat(rentals): add pricing and overlap services` · `feat(rentals): add rental request form and views` · `feat(rentals): add simulated payment and receipt`
   - Done notes: Implemented calculate_price (hourly/daily ceil), has_overlap, create_rental, and simulate_payment in rentals/services.py; created RentalRequestForm with validation; built views and templates for rental_request, rental_pay, and rental_receipt; verified all acceptance criteria via 25 unit tests and live shell QA.
 
-- [ ] **P2-05A Map for the handover location**
+- [x] **P2-05A Map for the handover location**
   - Files: `rentals/forms.py` (RentalRequestForm: if delivery_method = courier then delivery_address is required; optional pin via hidden delivery_latitude/longitude), rental request template (map_picker, shown only for courier), receipt and rental_detail templates (map_view).
   - Goal: for `pickup` rentals show the ITEM's pickup point; for `courier` rentals show the renter's delivery point; same partials as P2-04A.
   - Acceptance: courier without address is rejected; receipt shows the right map for each method; no map when no coordinates exist.
   - Commit: `feat(rentals): show handover location on map`
-  - Done notes:
+  - Done notes: Added delivery coordinates to RentalRequestForm with cross-field geographic validation; parameterized map_picker and map_view partials; integrated courier map picker into rental_request and dynamic handover map into rental_receipt; verified all acceptance criteria via 32 rental unit tests and live shell QA.
 
 - [ ] **P2-06 rentals: lifecycle**
   - Files: `rentals/services.py` (transition functions with allowed-transition table), views (my_rentals, owner_rentals, rental_detail, handover, mark_returned, confirm_return, cancel), templates.
