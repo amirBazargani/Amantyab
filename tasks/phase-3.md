@@ -7,12 +7,12 @@
   - Commits: `refactor(catalog): add Item queryset methods` · `refactor(rentals): add Rental queryset methods` · `refactor(reviews): add Review queryset methods` · `docs: describe managers in report`
   - Done notes: Implemented custom ItemQuerySet, RentalQuerySet, and ReviewQuerySet with full method suites and attached via as_manager(); refactored item_list to chained query methods; refactored rentals/reviews views and services; added 15 unit tests (total 133 tests passing); documented §4 in docs/REPORT.md; updated docs/DEFENSE.md and docs/COMMIT-LOG.md.
 
-- [ ] **P3-01A Rental-ending reminder (email + SMS)**
+- [x] **P3-01A Rental-ending reminder (email + SMS)**
   - Files: `rentals/management/commands/send_rental_reminders.py`, `config/settings.py` (`RENTAL_REMINDER_HOURS`, default 3), `templates/notifications/rental_ending_soon_{subject,body}.txt`, README (how to schedule).
   - Goal: command options `--hours` (default from settings), `--loop`, `--interval` (seconds, default 60). For each `Rental.objects.ending_soon(hours)` call `notify(rental.renter, "rental_ending_soon", {title, end_at in Asia/Tehran}, rental=rental)` and set `reminder_sent_at = now()` when at least one channel was `sent`. Print how many reminders were sent.
   - Acceptance: with seed data the 2-hour rental gets exactly one email and one SMS; running the command again sends 0; the 3-day rental and non-handed_over rentals are untouched; README documents cron and Windows Task Scheduler lines.
   - Commits: `feat(rentals): add ending_soon queryset method` (only if not already in P3-01) · `feat(rentals): add send_rental_reminders command`
-  - Done notes:
+  - Done notes: Implemented send_rental_reminders management command supporting --hours, --loop, and --interval; configured RENTAL_REMINDER_HOURS in settings.py; formatted end_at in Asia/Tehran for rental_ending_soon notification template; added cron and Windows Task Scheduler docs in README.md; added unit tests verifying idempotency, channel deliveries, and arguments (136 total tests passing).
 
 - [ ] **P3-02 Session management**
   - Files: `config/settings.py`, `accounts/views.py`, `catalog/views.py`.
