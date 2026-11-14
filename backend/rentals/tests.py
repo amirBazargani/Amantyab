@@ -1459,3 +1459,143 @@ class RentalDisputesAndAdminDashboardTestCase(TestCase):
         self.assertEqual(context["total_commission"], completed_rental.commission_amount)
 
 
+class RentalQuerySetTests(TestCase):
+    def setUp(self):
+        self.owner = User.objects.create_user(
+            username="rq_owner", email="rq_owner@example.com", password="PassWord123!"
+        )
+        self.renter1 = User.objects.create_user(
+            username="rq_renter1", email="rq_renter1@example.com", password="PassWord123!"
+        )
+        self.renter2 = User.objects.create_user(
+            username="rq_renter2", email="rq_renter2@example.com", password="PassWord123!"
+        )
+        self.category = Category.objects.create(name="ابزار ساختمانی", slug="construction")
+        self.item = Item.objects.create(
+            owner=self.owner,
+            category=self.category,
+            title="تراز لیزری دیوالت",
+            description="تراز لیزری ۳۶۰ درجه",
+            condition=Item.Condition.LIKE_NEW,
+            daily_price=Decimal("120000"),
+            city="تهران",
+            neighborhood="ونک",
+            allow_pickup=True,
+            is_active=True,
+        )
+
+        now = timezone.now()
+        # 1. Confirmed rental
+        self.rental_confirmed = Rental.objects.create(
+            item=self.item,
+            renter=self.renter1,
+            start_at=now + timedelta(days=1),
+            end_at=now + timedelta(days=3),
+            status=Rental.Status.CONFIRMED,
+            rent_amount=Decimal("240000"),
+            deposit_amount=Decimal("50000"),
+            commission_rate=Decimal("0.15"),
+            commission_amount=Decimal("36000"),
+            owner_payout=Decimal("204000"),
+            delivery_method=Rental.DeliveryMethod.PICKUP,
+        )
+        # 2. Cancelled rental
+        self.rental_cancelled = Rental.objects.create(
+            item=self.item,
+            renter=self.renter2,
+            start_at=now + timedelta(days=1, hours=2),
+            end_at=now + timedelta(days=2),
+            status=Rental.Status.CANCELLED,
+            rent_amount=Decimal("120000"),
+            deposit_amount=Decimal("0"),
+            commission_rate=Decimal("0.15"),
+            commission_amount=Decimal("18000"),
+            owner_payout=Decimal("102000"),
+            delivery_method=Rental.DeliveryMethod.PICKUP,
+        )
+        # 3. Handed over rental ending soon (in 2 hours)
+        self.rental_ending_soon = Rental.objects.create(
+            item=self.item,
+            renter=self.renter1,
+            start_at=now - timedelta(days=1),
+            end_at=now + timedelta(hours=2),
+            status=Rental.Status.HANDED_OVER,
+            rent_amount=Decimal("120000"),
+            deposit_amount=Decimal("0"),
+            commission_rate=Decimal("0.15"),
+            commission_amount=Decimal("18000"),
+            owner_payout=Decimal("102000"),
+            delivery_method=Rental.DeliveryMethod.PICKUP,
+            reminder_sent_at=None,
+        )
+        # 4. Handed over rental ending later (in 24 hours)
+        self.rental_ending_later = Rental.objects.create(
+            item=self.item,
+            renter=self.renter2,
+            start_at=now - timedelta(days=1),
+            end_at=now + timedelta(hours=24),
+            status=Rental.Status.HANDED_OVER,
+            rent_amount=Decimal("120000"),
+            deposit_amount=Decimal("0"),
+            commission_rate=Decimal("0.15"),
+            commission_amount=Decimal("18000"),
+            owner_payout=Decimal("102000"),
+            delivery_method=Rental.DeliveryMethod.PICKUP,
+            reminder_sent_at=None,
+        )
+
+    def test_blocking(self):
+        blocking = Rental.objects.blocking()
+        self.assertIn(self.rental_confirmed, blocking)
+        self.assertIn(self.rental_ending_soon, blocking)
+        self.assertNotIn(self.rental_cancelled, blocking)
+
+    def test_overlapping(self):
+        now = timezone.now()
+        # Overlaps rental_confirmed (days 1 to 3)
+        overlap_qs = Rental.objects.overlapping(
+            item=self.item,
+            start=now + timedelta(days=1, hours=12),
+            end=now + timedelta(days=2),
+        )
+        self.assertIn(self.rental_confirmed, overlap_qs)
+        self.assertIn(self.rental_cancelled, overlap_qs)
+
+        # Non-overlapping range
+        no_overlap = Rental.objects.overlapping(
+            item=self.item,
+            start=now + timedelta(days=10),
+            end=now + timedelta(days=12),
+        )
+        self.assertEqual(no_overlap.count(), 0)
+
+    def test_for_renter(self):
+        renter1_rentals = Rental.objects.for_renter(self.renter1)
+        self.assertIn(self.rental_confirmed, renter1_rentals)
+        self.assertIn(self.rental_ending_soon, renter1_rentals)
+        self.assertNotIn(self.rental_cancelled, renter1_rentals)
+
+    def test_for_owner(self):
+        owner_rentals = Rental.objects.for_owner(self.owner)
+        self.assertEqual(owner_rentals.count(), 4)
+
+    def test_with_status(self):
+        confirmed = Rental.objects.with_status(Rental.Status.CONFIRMED)
+        self.assertIn(self.rental_confirmed, confirmed)
+        self.assertNotIn(self.rental_cancelled, confirmed)
+
+        multiple = Rental.objects.with_status([Rental.Status.CONFIRMED, Rental.Status.CANCELLED])
+        self.assertEqual(multiple.count(), 2)
+
+    def test_ending_soon(self):
+        ending_soon_3h = Rental.objects.ending_soon(hours=3)
+        self.assertIn(self.rental_ending_soon, ending_soon_3h)
+        self.assertNotIn(self.rental_ending_later, ending_soon_3h)
+        self.assertNotIn(self.rental_confirmed, ending_soon_3h)
+
+        # Once reminder is sent, it is no longer returned
+        self.rental_ending_soon.reminder_sent_at = timezone.now()
+        self.rental_ending_soon.save()
+        self.assertNotIn(self.rental_ending_soon, Rental.objects.ending_soon(hours=3))
+
+
