@@ -143,6 +143,7 @@ EMAIL_BACKEND = os.getenv(
 DEFAULT_FROM_EMAIL = os.getenv("DEFAULT_FROM_EMAIL", "info@amanatyab.ir")
 
 SMS_BACKEND = os.getenv("SMS_BACKEND", "console")
+RENTAL_REMINDER_HOURS = int(os.getenv("RENTAL_REMINDER_HOURS", "3"))
 
 # Authentication settings
 LOGIN_URL = "accounts:login"
