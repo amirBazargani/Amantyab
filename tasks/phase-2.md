@@ -104,8 +104,8 @@ Each app has its own `urls.py` with `app_name`; root `config/urls.py` includes t
   - Done notes: Fully documented all 31 views across all 6 applications in docs/REPORT.md §5 with URL patterns, names, methods, permissions, templates, and descriptions; created docs/QA-P2.md with 48 granular manual QA checklist items covering every page, action, and permission level; added defense questions in docs/DEFENSE.md covering view architecture, IDOR/CSRF security, and quality assurance; verified all 118 unit and integration tests passing.
 
 ### Phase 2 deliverables checklist
-- [ ] every app has urls + views + templates + forms as listed
-- [ ] seed_demo works on an empty DB
-- [ ] signup + item registration send email AND SMS (console) and are visible in NotificationLog
-- [ ] maps work on item form, item detail, rental request/receipt
-- [ ] QA checklist all ticked; `db_backup/phase-2.sql`; tag `phase-2-done`
+- [x] every app has urls + views + templates + forms as listed
+- [x] seed_demo works on an empty DB
+- [x] signup + item registration send email AND SMS (console) and are visible in NotificationLog
+- [x] maps work on item form, item detail, rental request/receipt
+- [x] QA checklist all ticked; `db_backup/phase-2.sql`; tag `phase-2-done`
