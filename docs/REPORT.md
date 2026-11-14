@@ -414,7 +414,40 @@ erDiagram
 |---|---|---|---|
 
 ## ۵. Viewهای تعریف‌شده
-| اپ | View | URL | متد HTTP | دسترسی | Template |
-|---|---|---|---|---|---|
+در ادامه کلیه ویوهای پیاده‌سازی‌شده در سامانه امانت‌یاب به تفکیک اپلیکیشن، به همراه آدرس اینترنتی، متدهای HTTP مجاز، سطح دسترسی و قالب‌های رندرشده درج شده است:
+
+| اپلیکیشن | نام View | نام روت (URL Name) | آدرس (URL Pattern) | متدها | سطح دسترسی | قالب (Template) | شرح عملکرد |
+|---|---|---|---|---|---|---|---|
+| **core** | `home` | `home` | `/` | GET | عمومی (همه) | `core/home.html` | صفحه اصلی، نوار جستجو، دسته‌بندی‌ها و کالاهای فعال با فیلتر شهر |
+| **accounts** | `signup_view` | `signup` | `/accounts/signup/` | GET, POST | فقط مهمان (ناشناس) | `accounts/signup.html` | ثبت‌نام کاربر جدید، اعتبارسنجی موبایل ایران و ارسال پیامک/ایمیل خوش‌آمد |
+| **accounts** | `login_view` | `login` | `/accounts/login/` | GET, POST | فقط مهمان (ناشناس) | `accounts/login.html` | ورود با نام کاربری و رمز عبور؛ هدایت کاربر لاگین‌شده به خانه |
+| **accounts** | `logout_view` | `logout` | `/accounts/logout/` | POST | لاگین‌شده (`@login_required`) | _ندارد (ریدایرکت به خانه)_ | خروج امن از نشست کاربری با اعتبارسنجی توکن CSRF |
+| **accounts** | `profile_edit_view` | `profile` | `/accounts/profile/` | GET, POST | لاگین‌شده (`@login_required`) | `accounts/profile.html` | مشاهده و ویرایش مشخصات فردی، شهر، محله، شماره تماس و بیوگرافی |
+| **accounts** | `public_profile_view` | `public_profile` | `/accounts/users/<username>/` | GET | عمومی (همه) | `accounts/public_profile.html` | نمایش پروفایل عمومی کاربر، میانگین امتیاز، نظرات و کالاهای فعال او |
+| **catalog** | `item_list` | `item_list` | `/catalog/` | GET | عمومی (همه) | `catalog/item_list.html` | مرور و جستجوی کالاها با فیلتر دسته‌بندی، کلیدواژه، شهر و نقشه توزیع |
+| **catalog** | `item_detail` | `item_detail` | `/catalog/<int:pk>/` | GET | عمومی (همه) | `catalog/item_detail.html` | جزئیات کالا، گالری تصاویر، قیمت، ودیعه، نقشه موقعیت تقریبی و نظرات |
+| **catalog** | `item_create` | `item_create` | `/catalog/new/` | GET, POST | لاگین‌شده (`@login_required`) | `catalog/item_form.html` | ثبت کالای جدید، بارگذاری تصاویر، تعیین قیمت، نشانی و موقعیت روی نقشه |
+| **catalog** | `item_edit` | `item_edit` | `/catalog/<int:pk>/edit/` | GET, POST | فقط مالک کالا (`Item.owner`) | `catalog/item_form.html` | ویرایش مشخصات کالا، تصاویر، ودیعه و موقعیت جغرافیایی توسط مالک |
+| **catalog** | `my_items` | `my_items` | `/catalog/my-items/` | GET | لاگین‌شده (`@login_required`) | `catalog/my_items.html` | داشبورد کالاهای من جهت مدیریت، ویرایش، حذف و تغییر وضعیت فعال/غیرفعال |
+| **catalog** | `item_toggle_active` | `item_toggle_active` | `/catalog/<int:pk>/toggle-active/` | POST | فقط مالک کالا (`Item.owner`) | _ندارد (ریدایرکت به my_items)_ | فعال یا غیرفعال‌سازی سریع کالا جهت پنهان‌سازی از کاتالوگ عمومی |
+| **catalog** | `item_delete` | `item_delete` | `/catalog/<int:pk>/delete/` | POST | فقط مالک کالا (`Item.owner`) | _ندارد (ریدایرکت به my_items)_ | حذف کالا از سامانه مشروط به عدم وجود سابقه اجاره فعال |
+| **rentals** | `rental_request` | `rental_request` | `/rentals/request/<int:item_id>/` | GET, POST | لاگین‌شده (به جز مالک کالا) | `rentals/rental_request.html` | ثبت درخواست اجاره کالا با انتخاب بازه تاریخ، شیوه تحویل و آدرس/مختصات |
+| **rentals** | `my_rentals` | `my_rentals` | `/rentals/my-rentals/` | GET | لاگین‌شده (`@login_required`) | `rentals/my_rentals.html` | فهرست سفارش‌های اجاره کاربر به عنوان مستأجر با فیلتر وضعیت |
+| **rentals** | `owner_rentals` | `owner_rentals` | `/rentals/owner-rentals/` | GET | لاگین‌شده (`@login_required`) | `rentals/owner_rentals.html` | فهرست درخواست‌های اجاره دریافتی کالاها به عنوان موجر |
+| **rentals** | `rental_pay` | `rental_pay` | `/rentals/<int:pk>/pay/` | GET, POST | فقط مستأجر سفارش (`renter`) | `rentals/rental_pay.html` | درگاه پرداخت شبیه‌سازی‌شده جهت پرداخت وجه اجاره و ودیعه |
+| **rentals** | `rental_receipt` | `rental_receipt` | `/rentals/<int:pk>/receipt/` | GET | طرفین سفارش یا مدیر سیستم | `rentals/rental_receipt.html` | رسید پرداخت و جزئیات مالی سفارش، کارمزد و اطلاعات ودیعه |
+| **rentals** | `rental_detail` | `rental_detail` | `/rentals/<int:pk>/` | GET | طرفین سفارش یا مدیر سیستم | `rentals/rental_detail.html` | جزئیات سفارش اجاره، تایم‌لاین مراحل، نقشه تحویل و دکمه‌های عملیاتی |
+| **rentals** | `handover` | `handover` | `/rentals/<int:pk>/handover/` | POST | فقط مالک کالا در `confirmed` | _ندارد (ریدایرکت به جزئیات)_ | ثبت تحویل فیزیکی کالا به مستأجر و انتقال به وضعیت `handed_over` |
+| **rentals** | `mark_returned` | `mark_returned` | `/rentals/<int:pk>/return/` | POST | فقط مستأجر در `handed_over` | _ندارد (ریدایرکت به جزئیات)_ | اعلام بازگرداندن کالا توسط مستأجر و انتقال به وضعیت `returned` |
+| **rentals** | `confirm_return` | `confirm_return` | `/rentals/<int:pk>/confirm-return/` | POST | فقط مالک کالا در `returned` | _ندارد (ریدایرکت به جزئیات)_ | تایید دریافت کالا، استرداد ودیعه، تسویه با موجر و پایان اجاره (`completed`) |
+| **rentals** | `cancel` | `cancel` | `/rentals/<int:pk>/cancel/` | POST | طرفین سفارش (طبق قواعد لغو) | _ندارد (ریدایرکت به جزئیات)_ | لغو سفارش اجاره و استرداد مبالغ پرداختی قبل از تحویل کالا |
+| **rentals** | `dispute_open` | `dispute_open` | `/rentals/<int:pk>/dispute/` | GET, POST | طرفین در `handed_over`/`returned` | `rentals/dispute_form.html` | ثبت ادعای خسارت/اختلاف و تعلیق تسویه‌حساب‌ها (`disputed`) |
+| **rentals** | `admin_dashboard` | `admin_dashboard` | `/rentals/dashboard/` | GET | فقط مدیر سامانه (`is_staff`) | `rentals/admin_dashboard.html` | داشبورد آماری مدیر: شمارش کاربران، کالاها، وضعیت اجاره‌ها و درآمد کارمزد |
+| **rentals** | `admin_dispute_list` | `admin_dispute_list` | `/rentals/disputes/` | GET | فقط مدیر سامانه (`is_staff`) | `rentals/admin_dispute_list.html` | فهرست پرونده‌های اختلاف با امکان فیلتر بر اساس پرونده‌های باز یا حل‌شده |
+| **rentals** | `admin_dispute_resolve` | `admin_dispute_resolve` | `/rentals/disputes/<int:pk>/resolve/` | GET, POST | فقط مدیر سامانه (`is_staff`) | `rentals/admin_dispute_resolve.html` | داوری اختلاف، صدور رای سه‌گانه، تعیین تکلیف ودیعه و تسویه اتمیک مالی |
+| **reviews** | `review_create` | `review_create` | `/reviews/rentals/<int:rental_pk>/new/` | GET, POST | طرفین سفارش در `completed` | `reviews/review_form.html` | ثبت امتیاز ۱ تا ۵ ستاره و بازخورد متنی برای طرف مقابل یا کالای اجاره‌شده |
+| **chat** | `inbox` | `inbox` | `/chat/` | GET | لاگین‌شده (`@login_required`) | `chat/inbox.html` | صندوق پیام‌ها و فهرست گفتگوهای کالا-محور کاربر با نشانگر پیام‌های ناخوانده |
+| **chat** | `start_conversation` | `start_conversation` | `/chat/items/<int:item_pk>/start/` | GET | لاگین‌شده (به جز مالک کالا) | _ندارد (ریدایرکت به صفحه چت)_ | شروع یا بازیابی گفتگوی امن پیرامون یک کالای مشخص |
+| **chat** | `conversation_detail` | `conversation_detail` | `/chat/<int:pk>/` | GET, POST | فقط طرفین گفت‌وگو | `chat/conversation_detail.html` | صفحه گفتگوی تعاملی کالا-محور، ارسال پیام و علامت‌گذاری پیام‌های خوانده‌شده |
 
 ## ۶. نکات تکمیلی (Session/Cookie، Logging، تأیید ایمیل، تست‌ها)
