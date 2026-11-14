@@ -110,10 +110,31 @@
                 <span class="text-xs text-gray-500">امکان تغییر وضعیت یا تحویل کالا برای این سفارش وجود ندارد.</span>
             </div>
         </div>
+    {% elif rental.status == 'disputed' %}
+        <div class="bg-rose-50 border border-rose-200 p-5 rounded-2xl flex items-start justify-between gap-4 text-rose-900">
+            <div class="flex items-start space-x-3 space-x-reverse">
+                <div class="w-10 h-10 rounded-2xl bg-rose-100 flex items-center justify-center text-rose-600 flex-shrink-0 mt-0.5">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path>
+                    </svg>
+                </div>
+                <div>
+                    <span class="font-bold text-sm block">این سفارش در وضعیت «مورد اختلاف» قرار دارد.</span>
+                    <p class="text-xs text-rose-700 mt-1 leading-relaxed">
+                        پرونده اختلاف توسط یکی از طرفین ثبت شده و فرآیند تسویه مالی و عودت ودیعه تا زمان بررسی و صدور رأی توسط مدیر سامانه متوقف می‌باشد.
+                    </p>
+                </div>
+            </div>
+            {% if request.user.is_staff and active_dispute %}
+                <a href="{% url 'rentals:admin_dispute_resolve' active_dispute.pk %}" class="px-4 py-2 rounded-xl bg-rose-600 hover:bg-rose-700 text-white font-bold text-xs whitespace-nowrap shadow-sm transition">
+                    داوری پرونده (مدیر) ←
+                </a>
+            {% endif %}
+        </div>
     {% endif %}
 
     <!-- Action Toolbar (Allowed Lifecycle Actions) -->
-    {% if can_pay or can_handover or can_mark_returned or can_confirm_return or can_cancel %}
+    {% if can_pay or can_handover or can_mark_returned or can_confirm_return or can_cancel or can_dispute %}
         <div class="bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200 p-6 rounded-2xl shadow-sm space-y-4">
             <div class="flex items-center space-x-2 space-x-reverse text-blue-900 font-bold text-sm">
                 <svg class="w-5 h-5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -169,6 +190,16 @@
                     </form>
                 {% endif %}
 
+                <!-- Dispute Action (Participant on handed_over or returned) -->
+                {% if can_dispute %}
+                    <a href="{% url 'rentals:dispute_open' rental.pk %}" class="inline-flex items-center space-x-1.5 space-x-reverse bg-white hover:bg-rose-50 text-rose-600 border border-rose-200 font-medium px-4 py-2.5 rounded-xl text-xs shadow-sm transition">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path>
+                        </svg>
+                        <span>ثبت اختلاف و گزارش مشکل</span>
+                    </a>
+                {% endif %}
+
                 <!-- Cancel Action (Renter or Owner before handover) -->
                 {% if can_cancel %}
                     <form action="{% url 'rentals:cancel' rental.pk %}" method="post" onsubmit="return confirm('آیا از لغو این سفارش اطمینان دارید؟');">
@@ -181,6 +212,45 @@
                         </button>
                     </form>
                 {% endif %}
+            </div>
+        </div>
+    {% endif %}
+
+    <!-- Disputes History Section (if disputes exist) -->
+    {% if disputes %}
+        <div class="bg-white border border-gray-200 p-6 rounded-2xl shadow-sm space-y-4">
+            <div class="flex items-center justify-between pb-3 border-b border-gray-100">
+                <div class="flex items-center space-x-2 space-x-reverse text-gray-900 font-bold text-sm">
+                    <svg class="w-5 h-5 text-rose-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path>
+                    </svg>
+                    <span>سوابق داوری و حل اختلاف این سفارش</span>
+                </div>
+            </div>
+
+            <div class="space-y-3">
+                {% for disp in disputes %}
+                    <div class="p-4 rounded-xl border border-gray-100 bg-gray-50/70 space-y-2 text-xs">
+                        <div class="flex items-center justify-between">
+                            <span class="font-bold text-gray-900">
+                                گزارش ثبت‌شده توسط {{ disp.opened_by.username }}
+                            </span>
+                            <span class="px-2.5 py-0.5 rounded-full font-bold text-[10px] {% if disp.status == 'open' %}bg-rose-100 text-rose-700{% else %}bg-emerald-100 text-emerald-700{% endif %}">
+                                {{ disp.get_status_display }}
+                            </span>
+                        </div>
+                        <p class="text-gray-700 leading-relaxed">{{ disp.reason }}</p>
+                        {% if disp.status == 'resolved' %}
+                            <div class="pt-2 border-t border-gray-200 text-emerald-900 space-y-1">
+                                <div class="font-bold">رأی داوری: {{ disp.get_deposit_decision_display }}</div>
+                                {% if disp.resolution_note %}
+                                    <p class="text-[11px] text-gray-600 leading-relaxed">{{ disp.resolution_note }}</p>
+                                {% endif %}
+                                <div class="text-[11px] text-gray-400">داوری‌شده در: {{ disp.resolved_at|date:"Y/m/d H:i" }}</div>
+                            </div>
+                        {% endif %}
+                    </div>
+                {% endfor %}
             </div>
         </div>
     {% endif %}

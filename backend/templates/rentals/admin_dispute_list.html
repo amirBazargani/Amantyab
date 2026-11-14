@@ -1,0 +1,151 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}مدیریت پرونده‌های اختلاف — امانت‌یاب{% endblock %}
+
+{% block content %}
+<div class="max-w-6xl mx-auto px-4 py-8 space-y-6">
+    <!-- Breadcrumb -->
+    <nav class="flex items-center text-xs text-gray-500 space-x-2 space-x-reverse">
+        <a href="{% url 'core:home' %}" class="hover:text-blue-600 transition">صفحه اصلی</a>
+        <span>/</span>
+        <a href="{% url 'rentals:admin_dashboard' %}" class="hover:text-blue-600 transition">داشبورد مدیریت</a>
+        <span>/</span>
+        <span class="text-gray-800 font-semibold">پرونده‌های اختلاف</span>
+    </nav>
+
+    <!-- Header & Filter Tabs -->
+    <div class="bg-white border border-gray-200 rounded-3xl p-6 shadow-sm space-y-5">
+        <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 border-b border-gray-100 pb-5">
+            <div>
+                <h1 class="text-2xl font-black text-gray-900">پرونده‌های حل اختلاف و داوری</h1>
+                <p class="text-xs text-gray-500 mt-1">بررسی شکایات، تعیین وضعیت ودیعه و صدور احکام تسویه مالی</p>
+            </div>
+            <a href="{% url 'rentals:admin_dashboard' %}" class="text-xs font-bold text-purple-700 bg-purple-50 hover:bg-purple-100 px-4 py-2 rounded-xl border border-purple-200 transition self-start sm:self-auto">
+                بازگشت به داشبورد ادمین
+            </a>
+        </div>
+
+        <!-- Filter Tabs -->
+        <div class="flex flex-wrap items-center gap-2 text-xs">
+            <a href="{% url 'rentals:admin_dispute_list' %}"
+               class="px-4 py-2 rounded-xl font-bold transition {% if not status_filter %}bg-gray-900 text-white shadow-sm{% else %}bg-gray-100 text-gray-600 hover:bg-gray-200{% endif %}">
+                همه پرونده‌ها ({{ total_count }})
+            </a>
+            <a href="{% url 'rentals:admin_dispute_list' %}?status=open"
+               class="px-4 py-2 rounded-xl font-bold transition {% if status_filter == 'open' %}bg-rose-600 text-white shadow-sm{% else %}bg-rose-50 text-rose-700 hover:bg-rose-100{% endif %}">
+                در انتظار داوری ({{ open_count }})
+            </a>
+            <a href="{% url 'rentals:admin_dispute_list' %}?status=resolved"
+               class="px-4 py-2 rounded-xl font-bold transition {% if status_filter == 'resolved' %}bg-emerald-600 text-white shadow-sm{% else %}bg-emerald-50 text-emerald-700 hover:bg-emerald-100{% endif %}">
+                مختومه و تسویه‌شده ({{ resolved_count }})
+            </a>
+        </div>
+    </div>
+
+    <!-- Disputes List -->
+    <div class="space-y-4">
+        {% for disp in disputes %}
+            <div class="bg-white border border-gray-200 rounded-3xl p-6 shadow-sm hover:shadow-md transition space-y-4">
+                <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 border-b border-gray-100 pb-3">
+                    <div class="flex items-center gap-3">
+                        <span class="w-8 h-8 rounded-xl bg-gray-100 flex items-center justify-center font-mono font-bold text-xs text-gray-700">
+                            #{{ disp.pk }}
+                        </span>
+                        <div>
+                            <div class="flex items-center gap-2">
+                                <a href="{% url 'rentals:rental_detail' disp.rental_id %}" class="text-sm font-bold text-gray-900 hover:text-blue-600 transition">
+                                    {{ disp.rental.item.title }}
+                                </a>
+                                <span class="text-xs text-gray-400 font-mono">(سفارش #{{ disp.rental_id }})</span>
+                            </div>
+                            <span class="text-[11px] text-gray-400">
+                                ثبت‌شده در {{ disp.created_at|date:"Y/m/d H:i" }} توسط <strong>{{ disp.opened_by.username }}</strong>
+                            </span>
+                        </div>
+                    </div>
+
+                    <div>
+                        {% if disp.status == 'open' %}
+                            <span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-rose-50 text-rose-700 border border-rose-200 font-bold text-xs">
+                                <span class="w-2 h-2 rounded-full bg-rose-500 animate-pulse"></span>
+                                در انتظار داوری
+                            </span>
+                        {% else %}
+                            <span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200 font-bold text-xs">
+                                ✓ مختومه شده
+                            </span>
+                        {% endif %}
+                    </div>
+                </div>
+
+                <!-- Parties & Money Summary -->
+                <div class="grid grid-cols-2 sm:grid-cols-4 gap-3 p-3 bg-gray-50 rounded-2xl text-xs text-gray-600">
+                    <div>
+                        <span class="text-gray-400 block mb-0.5">موجر:</span>
+                        <span class="font-bold text-gray-800">{{ disp.rental.item.owner.username }}</span>
+                    </div>
+                    <div>
+                        <span class="text-gray-400 block mb-0.5">مستأجر:</span>
+                        <span class="font-bold text-gray-800">{{ disp.rental.renter.username }}</span>
+                    </div>
+                    <div>
+                        <span class="text-gray-400 block mb-0.5">مبلغ ودیعه:</span>
+                        <span class="font-bold text-amber-700">{{ disp.rental.deposit_amount|floatformat:0 }} تومان</span>
+                    </div>
+                    <div>
+                        <span class="text-gray-400 block mb-0.5">کرایه خالص:</span>
+                        <span class="font-bold text-gray-800">{{ disp.rental.owner_payout|floatformat:0 }} تومان</span>
+                    </div>
+                </div>
+
+                <!-- Reason -->
+                <div class="space-y-1">
+                    <span class="text-[11px] font-bold text-gray-500">شرح علت اختلاف:</span>
+                    <p class="text-xs text-gray-800 bg-gray-50/50 p-3 rounded-xl border border-gray-100 leading-relaxed">
+                        {{ disp.reason }}
+                    </p>
+                </div>
+
+                <!-- If Resolved Info -->
+                {% if disp.status == 'resolved' %}
+                    <div class="p-3 bg-emerald-50/70 border border-emerald-100 rounded-2xl text-xs space-y-1 text-emerald-900">
+                        <div class="flex items-center justify-between font-bold">
+                            <span>رأی مدیر: {{ disp.get_deposit_decision_display }}</span>
+                            <span class="text-[11px] text-emerald-700 font-normal">
+                                توسط {{ disp.resolved_by.username|default:"ادمین" }} در {{ disp.resolved_at|date:"Y/m/d H:i" }}
+                            </span>
+                        </div>
+                        {% if disp.resolution_note %}
+                            <p class="text-[11px] text-emerald-800 leading-relaxed">{{ disp.resolution_note }}</p>
+                        {% endif %}
+                    </div>
+                {% endif %}
+
+                <!-- Footer Actions -->
+                <div class="flex items-center justify-between pt-2 border-t border-gray-100 text-xs">
+                    <a href="{% url 'rentals:rental_detail' disp.rental_id %}" class="text-gray-500 hover:text-blue-600 transition">
+                        مشاهده جزئیات سفارش اجاره ←
+                    </a>
+
+                    {% if disp.status == 'open' %}
+                        <a href="{% url 'rentals:admin_dispute_resolve' disp.pk %}" class="px-5 py-2 rounded-xl bg-rose-600 hover:bg-rose-700 text-white font-bold transition shadow-sm hover:shadow flex items-center gap-1.5">
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                            </svg>
+                            <span>داوری و صدور رأی</span>
+                        </a>
+                    {% endif %}
+                </div>
+            </div>
+        {% empty %}
+            <div class="bg-white border border-gray-200 rounded-3xl p-12 text-center text-gray-400 space-y-2">
+                <svg class="w-12 h-12 mx-auto text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
+                </svg>
+                <p class="text-sm font-medium">هیچ پرونده اختلافی در این وضعیت یافت نشد.</p>
+            </div>
+        {% endfor %}
+    </div>
+</div>
+{% endblock %}

@@ -338,6 +338,17 @@
 - مفهوم جنگو/پایتون که استفاده شد: کوئری‌های پیچیده با شیء `Q` در جنگو ORM برای فیلتر دوطرفه گفتگوها (`renter == user | owner == user`)، بهینه‌سازی بارگذاری داده‌ها با `select_related` و `prefetch_related` جهت جلوگیری از مشکل N+1، کنترل دسترسی (`PermissionDenied`) برای کاربران غیرمجاز، و به‌روزرسانی دسته‌ای فیلدهای وضعیت با `QuerySet.update(is_read=True)`.
 - اگر استاد بپرسد: چرا شناسه کالا در مدل گفتگو (`Conversation`) گنجانده شده و یک گفتگوی عمومی بین دو کاربر نیست؟ پاسخ: طبق مدل دامنه در `DOMAIN.md`، امانت‌یاب یک پلتفرم مبادله کالا است؛ بنابراین گفتگوها کالا-محور هستند (`UniqueConstraint(item, renter)`). این طراحی باعث می‌شود تمام سوالات و هماهنگی‌های پیرامون یک کالای خاص در یک رشته پیام متمرکز بماند و اگر همان دو کاربر درباره کالای دیگری صحبت کنند، تاریخچه هر کالا مستقل و شفاف حفظ شود.
 
+---
+
+### 15549e5 — feat(rentals): add disputes and admin dashboard
+- تسک: P2-08
+- چه چیزی تغییر کرد: پیاده‌سازی فرم‌های `DisputeForm` (شرح علت اختلاف) و `DisputeResolveForm` (تعیین تکلیف ودیعه و یادداشت داوری)؛ پیاده‌سازی سرویس‌های اتمیک `open_dispute` و `resolve_dispute` در `rentals/services.py` جهت ثبت اختلاف و تسویه تراکنش‌ها متناسب با آرای سه‌گانه داوری (`return_to_renter`, `give_to_owner`, `split`)؛ ایجاد ویوی `dispute_open` ویژه طرفین سفارش در وضعیت‌های `handed_over` و `returned`؛ پیاده‌سازی بخش مدیریت پلتفرم با اعتبارسنجی سطح دسترسی `is_staff` (خطای ۴۰۳ برای کاربران عادی) شامل `admin_dashboard` (نمایش آمارهای کلیدی کاربران، کالاها، سفارش‌ها به تفکیک وضعیت و مجموع کارمزد)، `admin_dispute_list` (فهرست و فیلتر پرونده‌های اختلاف) و `admin_dispute_resolve` (داوری و صدور تسویه)؛ طراحی قالب‌های RTL و واکنش‌گرای Tailwind برای تمامی این ویوها؛ به‌روزرسانی `rental_detail.html` و `navbar.html`؛ و نگارش تست‌های خودکار در `rentals/tests.py`.
+- چرا لازم بود: طبق مستندات دامنه و فرآیندهای پروژه (`docs/PROCESSES.md` و `tasks/phase-2.md`)، برای اطمینان از سلامت معاملات همتابه‌همتا و جبران خسارت در زمان بروز اختلاف، سامانه نیازمند مکانیزم رسمی داوری، مسدودسازی و آزادسازی وجوه ودیعه توسط مدیر و داشبورد جامع نظارتی است.
+- فایل‌های مهم: `backend/rentals/forms.py`, `backend/rentals/services.py`, `backend/rentals/views.py`, `backend/rentals/urls.py`, `backend/rentals/tests.py`, `backend/templates/rentals/dispute_open.html`, `backend/templates/rentals/admin_dashboard.html`, `backend/templates/rentals/admin_dispute_list.html`, `backend/templates/rentals/admin_dispute_resolve.html`, `backend/templates/rentals/rental_detail.html`, `backend/templates/partials/navbar.html`.
+- مفهوم جنگو/پایتون که استفاده شد: تراکنش‌های پایگاه داده با `@transaction.atomic` و قفل سطری `select_for_update`، کنترل دسترسی ادمین با `PermissionDenied` و ایجاد پاسخ ۴۰۳، تجمیع آماری داده‌ها با متدهای `aggregate` و `Sum`، محاسبات پولی با `Decimal` و گردکردن بانکی `ROUND_HALF_UP`، فرم‌های مدل (`ModelForm`) با رادیوباتن‌های سفارشی و اعتبارسنجی اختصاصی.
+- اگر استاد بپرسد: در زمان داوری اختلاف توسط مدیر، مبالغ ودیعه و سهم اجاره چگونه تسویه می‌شوند؟ پاسخ: بسته به رأی مدیر در فیلد `deposit_decision`: در حالت `return_to_renter` کل ودیعه در قالب سطر `Payment` از نوع `deposit_refund` به مستأجر مسترد می‌شود و سهم اجاره موجر (`payout`) نیز پرداخت می‌گردد؛ در حالت `give_to_owner` کل ودیعه به عنوان جبران خسارت به همراه سهم اجاره در قالب سطرهای `payout` به حساب موجر واریز می‌شود؛ و در حالت `split` ودیعه به صورت ۵۰-۵۰ تقسیم شده و نصف آن استرداد (`deposit_refund`) و نصف دیگر به عنوان خسارت به موجر (`payout`) پرداخت می‌شود. در پایان، وضعیت سفارش به `completed` تغییر می‌یابد.
+
+
 
 
 

@@ -85,10 +85,11 @@ Each app has its own `urls.py` with `app_name`; root `config/urls.py` includes t
   - Commits: `feat(reviews): add two-way review form and views` · `feat(chat): add conversations and messages`
   - Done notes: Implemented ReviewForm and review_create view with permission checks and once-per-side validation on completed rentals; integrated average ratings and review lists into item detail and user profile pages; added review action to completed rentals; implemented MessageForm and chat views (inbox, start_conversation, conversation_detail) with 403 checks for outsiders and automatic read status update; created RTL Tailwind chat and review templates and added chat link to navbar; verified with 25 unit tests and live shell execution.
 
-- [ ] **P2-08 disputes + admin dashboard**
+- [x] **P2-08 disputes + admin dashboard**
   - Files: `rentals/forms.py` (DisputeForm, DisputeResolveForm), views (dispute_open, admin_dispute_list, admin_dispute_resolve, admin_dashboard), templates. Staff-only checks.
   - Acceptance: participant can open a dispute on handed_over/returned; non-staff get 403 on admin pages; resolving sets deposit decision, creates the matching Payment row and completes the rental; dashboard shows counts (users, items, rentals by status, total commission).
   - Commit: `feat(rentals): add disputes and admin dashboard`
+  - Done notes: Implemented DisputeForm and DisputeResolveForm with custom widgets; implemented open_dispute and resolve_dispute atomic services supporting all 3 deposit decisions (return_to_renter, give_to_owner, split) and creating matching Payment rows; implemented dispute_open view allowing participants to open disputes on handed_over/returned rentals; implemented staff-only admin views (admin_dashboard with platform counts/commission, admin_dispute_list with filters, admin_dispute_resolve) enforcing HTTP 403 for non-staff; created responsive RTL Tailwind templates and updated rental_detail and navbar; verified with 52 automated tests and interactive Django shell QA covering all acceptance criteria.
 
 - [ ] **P2-09 Test data entry**
   - Files: `core/management/commands/seed_demo.py`.
