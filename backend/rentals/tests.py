@@ -9,8 +9,8 @@ from django.urls import reverse
 from django.utils import timezone
 
 from catalog.models import Category, Item
-from .forms import RentalRequestForm
-from .models import Payment, Rental
+from .forms import DisputeForm, DisputeResolveForm, RentalRequestForm
+from .models import Dispute, Payment, Rental
 from .services import (
     calculate_price,
     can_transition,
@@ -21,6 +21,8 @@ from .services import (
     handover_rental,
     has_overlap,
     mark_returned_rental,
+    open_dispute,
+    resolve_dispute,
     simulate_payment,
 )
 
@@ -1132,4 +1134,328 @@ class RentalLifecycleTestCase(TestCase):
         self.assertTrue(
             Payment.objects.filter(rental=rental, kind=Payment.Kind.PAYOUT).exists()
         )
+
+
+class RentalDisputesAndAdminDashboardTestCase(TestCase):
+    def setUp(self):
+        self.owner = User.objects.create_user(
+            username="disp_owner",
+            email="disp_owner@test.com",
+            password="StrongPassword123!",
+            phone="09121111115",
+        )
+        self.renter = User.objects.create_user(
+            username="disp_renter",
+            email="disp_renter@test.com",
+            password="StrongPassword123!",
+            phone="09122222226",
+        )
+        self.other_user = User.objects.create_user(
+            username="disp_other",
+            email="disp_other@test.com",
+            password="StrongPassword123!",
+            phone="09123333337",
+        )
+        self.staff_admin = User.objects.create_user(
+            username="disp_admin",
+            email="disp_admin@test.com",
+            password="StrongPassword123!",
+            phone="09124444448",
+            is_staff=True,
+        )
+        self.category = Category.objects.create(name="ابزار تست", slug="test-tools-disp")
+        self.item = Item.objects.create(
+            owner=self.owner,
+            category=self.category,
+            title="مینی فرز بوش",
+            description="مینی فرز بسیار تمیز",
+            condition=Item.Condition.LIKE_NEW,
+            daily_price=Decimal("100000"),
+            deposit_amount=Decimal("500000"),
+            city="تهران",
+            allow_pickup=True,
+            allow_courier=True,
+        )
+
+    def _create_rental_in_status(self, status):
+        start = timezone.now() + timedelta(days=1)
+        end = start + timedelta(days=2)
+        rental = Rental.objects.create(
+            item=self.item,
+            renter=self.renter,
+            start_at=start,
+            end_at=end,
+            delivery_method=Rental.DeliveryMethod.PICKUP,
+            status=status,
+            rent_amount=Decimal("200000"),
+            deposit_amount=Decimal("500000"),
+            commission_rate=Decimal("0.15"),
+            commission_amount=Decimal("30000"),
+            owner_payout=Decimal("170000"),
+            tracking_code=f"TRK-TEST-{status}",
+        )
+        # Create initial simulated payments
+        Payment.objects.create(
+            rental=rental,
+            kind=Payment.Kind.RENT,
+            amount=rental.rent_amount,
+            status=Payment.Status.SUCCESS,
+            receipt_no=f"RENT-{rental.pk}",
+        )
+        Payment.objects.create(
+            rental=rental,
+            kind=Payment.Kind.DEPOSIT,
+            amount=rental.deposit_amount,
+            status=Payment.Status.SUCCESS,
+            receipt_no=f"DEP-{rental.pk}",
+        )
+        return rental
+
+    def test_participant_can_open_dispute_on_handed_over_and_returned(self):
+        """Participant (renter or owner) can open a dispute when rental is handed_over or returned."""
+        client = Client()
+
+        # 1. Renter opens dispute on handed_over rental
+        rental_ho = self._create_rental_in_status(Rental.Status.HANDED_OVER)
+        client.force_login(self.renter)
+        resp = client.post(
+            reverse("rentals:dispute_open", kwargs={"pk": rental_ho.pk}),
+            {"reason": "دستگاه هنگام تحویل دارای نقص فنی بوده و کار نمی‌کند."},
+        )
+        self.assertEqual(resp.status_code, 302)
+        rental_ho.refresh_from_db()
+        self.assertEqual(rental_ho.status, Rental.Status.DISPUTED)
+        dispute_ho = rental_ho.disputes.first()
+        self.assertIsNotNone(dispute_ho)
+        self.assertEqual(dispute_ho.opened_by, self.renter)
+        self.assertEqual(dispute_ho.status, Dispute.Status.OPEN)
+
+        # 2. Owner opens dispute on returned rental
+        rental_ret = self._create_rental_in_status(Rental.Status.RETURNED)
+        client.force_login(self.owner)
+        resp = client.post(
+            reverse("rentals:dispute_open", kwargs={"pk": rental_ret.pk}),
+            {"reason": "قطعه جانبی مینی فرز مفقود شده و دستگاه کثیف بازگردانده شده است."},
+        )
+        self.assertEqual(resp.status_code, 302)
+        rental_ret.refresh_from_db()
+        self.assertEqual(rental_ret.status, Rental.Status.DISPUTED)
+        dispute_ret = rental_ret.disputes.first()
+        self.assertIsNotNone(dispute_ret)
+        self.assertEqual(dispute_ret.opened_by, self.owner)
+        self.assertEqual(dispute_ret.status, Dispute.Status.OPEN)
+
+    def test_non_participant_cannot_open_dispute(self):
+        """A user who is neither renter nor owner gets 403 on dispute_open."""
+        client = Client()
+        rental = self._create_rental_in_status(Rental.Status.HANDED_OVER)
+        client.force_login(self.other_user)
+        resp = client.get(reverse("rentals:dispute_open", kwargs={"pk": rental.pk}))
+        self.assertEqual(resp.status_code, 403)
+
+        resp = client.post(
+            reverse("rentals:dispute_open", kwargs={"pk": rental.pk}),
+            {"reason": "تلاش غیرمجاز برای ایجاد اختلاف توسط فرد ثالث."},
+        )
+        self.assertEqual(resp.status_code, 403)
+        rental.refresh_from_db()
+        self.assertEqual(rental.status, Rental.Status.HANDED_OVER)
+
+    def test_cannot_open_dispute_on_invalid_status(self):
+        """Cannot open dispute on confirmed, pending_payment, or completed rental."""
+        client = Client()
+        rental_conf = self._create_rental_in_status(Rental.Status.CONFIRMED)
+        client.force_login(self.renter)
+        resp = client.get(reverse("rentals:dispute_open", kwargs={"pk": rental_conf.pk}))
+        # Redirected back to detail with error message
+        self.assertEqual(resp.status_code, 302)
+        self.assertIn(reverse("rentals:rental_detail", kwargs={"pk": rental_conf.pk}), resp.url)
+
+        resp = client.post(
+            reverse("rentals:dispute_open", kwargs={"pk": rental_conf.pk}),
+            {"reason": "متن تستی برای وضعیت غیرمجاز"},
+        )
+        self.assertEqual(resp.status_code, 302)
+        rental_conf.refresh_from_db()
+        self.assertEqual(rental_conf.status, Rental.Status.CONFIRMED)
+
+    def test_non_staff_forbidden_on_admin_pages(self):
+        """Non-staff users get 403 on admin_dashboard, admin_dispute_list, and admin_dispute_resolve."""
+        client = Client()
+        rental = self._create_rental_in_status(Rental.Status.HANDED_OVER)
+        dispute = open_dispute(rental, self.renter, "شکایت به علت شکستگی قاب دستگاه")
+
+        # 1. Anonymous user redirected to login
+        resp = client.get(reverse("rentals:admin_dashboard"))
+        self.assertEqual(resp.status_code, 302)
+
+        resp = client.get(reverse("rentals:admin_dispute_list"))
+        self.assertEqual(resp.status_code, 302)
+
+        resp = client.get(reverse("rentals:admin_dispute_resolve", kwargs={"pk": dispute.pk}))
+        self.assertEqual(resp.status_code, 302)
+
+        # 2. Authenticated non-staff gets 403 Forbidden
+        client.force_login(self.renter)
+        resp = client.get(reverse("rentals:admin_dashboard"))
+        self.assertEqual(resp.status_code, 403)
+
+        resp = client.get(reverse("rentals:admin_dispute_list"))
+        self.assertEqual(resp.status_code, 403)
+
+        resp = client.get(reverse("rentals:admin_dispute_resolve", kwargs={"pk": dispute.pk}))
+        self.assertEqual(resp.status_code, 403)
+
+        resp = client.post(
+            reverse("rentals:admin_dispute_resolve", kwargs={"pk": dispute.pk}),
+            {"deposit_decision": "return_to_renter", "resolution_note": "تلاش غیرمجاز"},
+        )
+        self.assertEqual(resp.status_code, 403)
+
+    def test_admin_dispute_list_view(self):
+        """Staff user can view dispute list and filter by status."""
+        client = Client()
+        rental1 = self._create_rental_in_status(Rental.Status.HANDED_OVER)
+        disp1 = open_dispute(rental1, self.renter, "علت اختلاف اول برای تست")
+
+        rental2 = self._create_rental_in_status(Rental.Status.RETURNED)
+        disp2 = open_dispute(rental2, self.owner, "علت اختلاف دوم برای تست")
+        resolve_dispute(disp2, self.staff_admin, Dispute.DepositDecision.RETURN_TO_RENTER, "حل شد")
+
+        client.force_login(self.staff_admin)
+        # All disputes
+        resp = client.get(reverse("rentals:admin_dispute_list"))
+        self.assertEqual(resp.status_code, 200)
+        self.assertContains(resp, "پرونده‌های حل اختلاف و داوری")
+        self.assertContains(resp, "علت اختلاف اول برای تست")
+        self.assertContains(resp, "علت اختلاف دوم برای تست")
+
+        # Open disputes filter
+        resp_open = client.get(reverse("rentals:admin_dispute_list") + "?status=open")
+        self.assertEqual(resp_open.status_code, 200)
+        self.assertContains(resp_open, "علت اختلاف اول برای تست")
+        self.assertNotContains(resp_open, "علت اختلاف دوم برای تست")
+
+        # Resolved disputes filter
+        resp_res = client.get(reverse("rentals:admin_dispute_list") + "?status=resolved")
+        self.assertEqual(resp_res.status_code, 200)
+        self.assertNotContains(resp_res, "علت اختلاف اول برای تست")
+        self.assertContains(resp_res, "علت اختلاف دوم برای تست")
+
+    def test_admin_dispute_resolve_return_to_renter(self):
+        """Resolving with return_to_renter refunds deposit to renter and completes rental."""
+        client = Client()
+        rental = self._create_rental_in_status(Rental.Status.HANDED_OVER)
+        dispute = open_dispute(rental, self.renter, "کالا معیوب تحویل شد و کار نمی‌کند.")
+
+        client.force_login(self.staff_admin)
+        resp = client.post(
+            reverse("rentals:admin_dispute_resolve", kwargs={"pk": dispute.pk}),
+            {
+                "deposit_decision": Dispute.DepositDecision.RETURN_TO_RENTER,
+                "resolution_note": "با توجه به ادعای مستند، کل ودیعه به مستأجر مسترد می‌گردد.",
+            },
+        )
+        self.assertEqual(resp.status_code, 302)
+        dispute.refresh_from_db()
+        rental.refresh_from_db()
+
+        self.assertEqual(dispute.status, Dispute.Status.RESOLVED)
+        self.assertEqual(dispute.deposit_decision, Dispute.DepositDecision.RETURN_TO_RENTER)
+        self.assertEqual(dispute.resolved_by, self.staff_admin)
+        self.assertIsNotNone(dispute.resolved_at)
+        self.assertEqual(rental.status, Rental.Status.COMPLETED)
+
+        # Payments check: deposit_refund for renter, payout for owner
+        refund = Payment.objects.filter(rental=rental, kind=Payment.Kind.DEPOSIT_REFUND).first()
+        self.assertIsNotNone(refund)
+        self.assertEqual(refund.amount, rental.deposit_amount)
+
+        payout = Payment.objects.filter(rental=rental, kind=Payment.Kind.PAYOUT).first()
+        self.assertIsNotNone(payout)
+        self.assertEqual(payout.amount, rental.owner_payout)
+
+    def test_admin_dispute_resolve_give_to_owner(self):
+        """Resolving with give_to_owner pays deposit to owner as damage compensation."""
+        client = Client()
+        rental = self._create_rental_in_status(Rental.Status.RETURNED)
+        dispute = open_dispute(rental, self.owner, "شکستگی موتور فرز به علت استفاده نادرست.")
+
+        client.force_login(self.staff_admin)
+        resp = client.post(
+            reverse("rentals:admin_dispute_resolve", kwargs={"pk": dispute.pk}),
+            {
+                "deposit_decision": Dispute.DepositDecision.GIVE_TO_OWNER,
+                "resolution_note": "خسارت وارده به دستگاه محرز است؛ ودیعه به موجر واگذار می‌شود.",
+            },
+        )
+        self.assertEqual(resp.status_code, 302)
+        dispute.refresh_from_db()
+        rental.refresh_from_db()
+
+        self.assertEqual(dispute.status, Dispute.Status.RESOLVED)
+        self.assertEqual(dispute.deposit_decision, Dispute.DepositDecision.GIVE_TO_OWNER)
+        self.assertEqual(rental.status, Rental.Status.COMPLETED)
+
+        # Payments check: NO deposit_refund, deposit payout to owner + rent payout to owner
+        self.assertFalse(Payment.objects.filter(rental=rental, kind=Payment.Kind.DEPOSIT_REFUND).exists())
+        payouts = Payment.objects.filter(rental=rental, kind=Payment.Kind.PAYOUT)
+        # Should have payout for deposit (500,000) and payout for rent (170,000)
+        payout_amounts = sorted([p.amount for p in payouts])
+        self.assertEqual(payout_amounts, [Decimal("170000"), Decimal("500000")])
+
+    def test_admin_dispute_resolve_split(self):
+        """Resolving with split divides deposit 50-50 between renter and owner."""
+        client = Client()
+        rental = self._create_rental_in_status(Rental.Status.RETURNED)
+        dispute = open_dispute(rental, self.owner, "بخشی از متعلقات مفقود شده است.")
+
+        client.force_login(self.staff_admin)
+        resp = client.post(
+            reverse("rentals:admin_dispute_resolve", kwargs={"pk": dispute.pk}),
+            {
+                "deposit_decision": Dispute.DepositDecision.SPLIT,
+                "resolution_note": "توافق شد ودیعه ۵۰-۵۰ میان طرفین تسهیم گردد.",
+            },
+        )
+        self.assertEqual(resp.status_code, 302)
+        dispute.refresh_from_db()
+        rental.refresh_from_db()
+
+        self.assertEqual(dispute.status, Dispute.Status.RESOLVED)
+        self.assertEqual(dispute.deposit_decision, Dispute.DepositDecision.SPLIT)
+        self.assertEqual(rental.status, Rental.Status.COMPLETED)
+
+        # Deposit was 500,000: renter gets 250,000 refund, owner gets 250,000 payout + 170,000 rent payout
+        refund = Payment.objects.filter(rental=rental, kind=Payment.Kind.DEPOSIT_REFUND).first()
+        self.assertIsNotNone(refund)
+        self.assertEqual(refund.amount, Decimal("250000"))
+
+        payouts = Payment.objects.filter(rental=rental, kind=Payment.Kind.PAYOUT)
+        payout_amounts = sorted([p.amount for p in payouts])
+        self.assertEqual(payout_amounts, [Decimal("170000"), Decimal("250000")])
+
+    def test_admin_dashboard_metrics(self):
+        """Admin dashboard displays accurate counts of users, items, rentals by status, and commission."""
+        client = Client()
+        client.force_login(self.staff_admin)
+
+        # Create one completed rental with known commission
+        completed_rental = self._create_rental_in_status(Rental.Status.COMPLETED)
+        # Create one handed_over rental
+        self._create_rental_in_status(Rental.Status.HANDED_OVER)
+
+        resp = client.get(reverse("rentals:admin_dashboard"))
+        self.assertEqual(resp.status_code, 200)
+
+        # Context assertions
+        context = resp.context
+        self.assertEqual(context["users_count"], User.objects.count())
+        self.assertEqual(context["items_count"], Item.objects.count())
+        self.assertEqual(context["total_rentals"], Rental.objects.count())
+        self.assertIn("rentals_by_status", context)
+        self.assertEqual(context["rentals_by_status"]["completed"], 1)
+        self.assertEqual(context["rentals_by_status"]["handed_over"], 1)
+        self.assertEqual(context["total_commission"], completed_rental.commission_amount)
+
 

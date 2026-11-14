@@ -8,7 +8,7 @@ from django.db import transaction
 from django.utils import timezone
 from django.utils.translation import gettext_lazy as _
 
-from .models import Payment, Rental
+from .models import Dispute, Payment, Rental
 
 
 def calculate_price(item, start_at, end_at, commission_rate=Decimal("0.15")):
@@ -424,4 +424,162 @@ def cancel_rental(rental, user):
     rental.status = Rental.Status.CANCELLED
     rental.save(update_fields=["status", "updated_at"])
     return rental
+
+
+@transaction.atomic
+def open_dispute(rental, user, reason):
+    """
+    Open a dispute on an active rental (handed_over or returned).
+    Only participants (renter or owner, or staff) can open.
+    Transitions rental status to 'disputed' and creates Dispute record.
+    """
+    rental = Rental.objects.select_for_update().select_related("item", "item__owner", "renter").get(pk=rental.pk)
+
+    if rental.status not in (Rental.Status.HANDED_OVER, Rental.Status.RETURNED):
+        raise ValidationError(
+            _("ثبت اختلاف تنها برای سفارش‌های در حال استفاده یا بازگردانده‌شده امکان‌پذیر است.")
+        )
+
+    if not can_transition(rental, Rental.Status.DISPUTED, user):
+        raise PermissionDenied(
+            _("شما مجاز به ثبت اختلاف برای این سفارش نمی‌باشید.")
+        )
+
+    if rental.disputes.filter(status=Dispute.Status.OPEN).exists():
+        raise ValidationError(
+            _("یک پرونده اختلاف فعال برای این سفارش در جریان است.")
+        )
+
+    dispute = Dispute.objects.create(
+        rental=rental,
+        opened_by=user,
+        reason=reason,
+        status=Dispute.Status.OPEN,
+    )
+
+    rental.status = Rental.Status.DISPUTED
+    rental.save(update_fields=["status", "updated_at"])
+    return dispute
+
+
+@transaction.atomic
+def resolve_dispute(dispute, admin_user, deposit_decision, resolution_note=""):
+    """
+    Admin resolves a dispute.
+    Sets deposit_decision, creates matching Payment rows,
+    marks dispute as resolved, and completes the rental.
+    """
+    dispute = (
+        Dispute.objects.select_for_update()
+        .select_related("rental", "rental__item", "rental__item__owner", "rental__renter")
+        .get(pk=dispute.pk)
+    )
+
+    if not admin_user or not admin_user.is_staff:
+        raise PermissionDenied(
+            _("تنها مدیران سامانه مجاز به داوری و حل اختلاف هستند.")
+        )
+
+    if dispute.status != Dispute.Status.OPEN:
+        raise ValidationError(
+            _("این پرونده اختلاف قبلاً تعیین تکلیف و مختومه شده است.")
+        )
+
+    if deposit_decision not in Dispute.DepositDecision.values:
+        raise ValidationError(
+            _("تصمیم تعیین‌شده برای ودیعه نامعتبر است.")
+        )
+
+    rental = dispute.rental
+
+    # 1. Handle deposit distribution according to deposit_decision
+    if deposit_decision == Dispute.DepositDecision.RETURN_TO_RENTER:
+        # Deposit refunded to renter
+        if rental.deposit_amount > 0:
+            already_refunded = rental.payments.filter(
+                kind=Payment.Kind.DEPOSIT_REFUND,
+                status=Payment.Status.SUCCESS,
+            ).exists()
+            if not already_refunded:
+                Payment.objects.create(
+                    rental=rental,
+                    kind=Payment.Kind.DEPOSIT_REFUND,
+                    amount=rental.deposit_amount,
+                    status=Payment.Status.SUCCESS,
+                    receipt_no=generate_receipt_no("dep_ref", rental.pk),
+                )
+    elif deposit_decision == Dispute.DepositDecision.GIVE_TO_OWNER:
+        # Deposit given to owner as damage compensation
+        if rental.deposit_amount > 0:
+            Payment.objects.create(
+                rental=rental,
+                kind=Payment.Kind.PAYOUT,
+                amount=rental.deposit_amount,
+                status=Payment.Status.SUCCESS,
+                receipt_no=generate_receipt_no("dep_own", rental.pk),
+            )
+    elif deposit_decision == Dispute.DepositDecision.SPLIT:
+        # Split deposit between renter and owner (50-50)
+        if rental.deposit_amount > 0:
+            half_deposit = (rental.deposit_amount / Decimal("2")).quantize(
+                Decimal("1"), rounding=ROUND_HALF_UP
+            )
+            owner_deposit_share = rental.deposit_amount - half_deposit
+
+            if half_deposit > 0:
+                Payment.objects.create(
+                    rental=rental,
+                    kind=Payment.Kind.DEPOSIT_REFUND,
+                    amount=half_deposit,
+                    status=Payment.Status.SUCCESS,
+                    receipt_no=generate_receipt_no("dep_ref", rental.pk),
+                )
+
+            if owner_deposit_share > 0:
+                Payment.objects.create(
+                    rental=rental,
+                    kind=Payment.Kind.PAYOUT,
+                    amount=owner_deposit_share,
+                    status=Payment.Status.SUCCESS,
+                    receipt_no=generate_receipt_no("dep_own", rental.pk),
+                )
+
+    # 2. Pay rent share to owner if not already paid
+    if rental.owner_payout > 0:
+        already_paid_out = rental.payments.filter(
+            kind=Payment.Kind.PAYOUT,
+            receipt_no__startswith="PAYOUT-",
+            status=Payment.Status.SUCCESS,
+        ).exists()
+        if not already_paid_out:
+            Payment.objects.create(
+                rental=rental,
+                kind=Payment.Kind.PAYOUT,
+                amount=rental.owner_payout,
+                status=Payment.Status.SUCCESS,
+                receipt_no=generate_receipt_no("payout", rental.pk),
+            )
+
+    # 3. Update dispute record
+    dispute.deposit_decision = deposit_decision
+    dispute.resolution_note = resolution_note
+    dispute.status = Dispute.Status.RESOLVED
+    dispute.resolved_by = admin_user
+    dispute.resolved_at = timezone.now()
+    dispute.save(
+        update_fields=[
+            "deposit_decision",
+            "resolution_note",
+            "status",
+            "resolved_by",
+            "resolved_at",
+        ]
+    )
+
+    # 4. Complete the rental
+    rental.status = Rental.Status.COMPLETED
+    rental.save(update_fields=["status", "updated_at"])
+
+    return dispute
+
 

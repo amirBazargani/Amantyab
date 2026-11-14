@@ -39,8 +39,8 @@
             <div class="hidden md:flex items-center space-x-3 space-x-reverse">
                 {% if request.user.is_authenticated %}
                     {% if request.user.is_staff %}
-                        <a href="{% url 'admin:index' %}" class="text-xs bg-purple-50 text-purple-700 hover:bg-purple-100 font-medium px-3 py-1.5 rounded-md border border-purple-200 transition">
-                            پنل مدیریت
+                        <a href="{% url 'rentals:admin_dashboard' %}" class="text-xs bg-purple-50 text-purple-700 hover:bg-purple-100 font-bold px-3 py-1.5 rounded-md border border-purple-200 transition">
+                            داشبورد مدیر
                         </a>
                     {% endif %}
 
@@ -89,7 +89,7 @@
                 <a href="{{ item_create_url|default:'/catalog/new/' }}" class="block px-3 py-2 rounded-md text-base font-medium text-gray-700 hover:bg-gray-100">ثبت کالا</a>
                 <a href="{{ profile_url|default:'/accounts/profile/' }}" class="block px-3 py-2 rounded-md text-base font-medium text-gray-700 hover:bg-gray-100">پروفایل کاربری ({{ request.user.first_name|default:request.user.phone }})</a>
                 {% if request.user.is_staff %}
-                    <a href="{% url 'admin:index' %}" class="block px-3 py-2 rounded-md text-base font-medium text-purple-700 hover:bg-purple-50">پنل مدیریت</a>
+                    <a href="{% url 'rentals:admin_dashboard' %}" class="block px-3 py-2 rounded-md text-base font-medium text-purple-700 hover:bg-purple-50">داشبورد نظارت مدیر</a>
                 {% endif %}
                 <form action="{{ logout_url|default:'/accounts/logout/' }}" method="post" class="pt-2">
                     {% csrf_token %}

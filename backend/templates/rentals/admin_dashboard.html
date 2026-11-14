@@ -1,0 +1,233 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}داشبورد مدیریت پلتفرم — امانت‌یاب{% endblock %}
+
+{% block content %}
+<div class="max-w-7xl mx-auto px-4 py-8 space-y-8">
+    <!-- Header -->
+    <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 border-b border-gray-200 pb-5">
+        <div>
+            <div class="flex items-center gap-2">
+                <span class="text-xs font-bold bg-purple-100 text-purple-800 px-3 py-1 rounded-full border border-purple-200">
+                    پنل اختصاصی مدیریت (Staff)
+                </span>
+                <span class="text-xs text-gray-400">سامانه امانت‌یاب</span>
+            </div>
+            <h1 class="text-2xl sm:text-3xl font-black text-gray-900 mt-2">داشبورد مدیریت و نظارت پلتفرم</h1>
+            <p class="text-xs text-gray-500 mt-1">مشاهده آمار کلیدی کاربران، کالاها، وضعیت سفارش‌های امانت و درآمدهای کارمزد</p>
+        </div>
+
+        <div class="flex items-center gap-3">
+            <a href="{% url 'rentals:admin_dispute_list' %}" class="inline-flex items-center gap-1.5 px-4 py-2.5 rounded-xl bg-rose-50 text-rose-700 hover:bg-rose-100 font-bold text-xs border border-rose-200 transition">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path>
+                </svg>
+                <span>پرونده‌های اختلاف ({{ open_disputes_count }})</span>
+            </a>
+            <a href="{% url 'admin:index' %}" class="inline-flex items-center gap-1.5 px-4 py-2.5 rounded-xl bg-purple-600 hover:bg-purple-700 text-white font-bold text-xs shadow-sm transition">
+                <span>پنل جنگو ادمین</span>
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"></path>
+                </svg>
+            </a>
+        </div>
+    </div>
+
+    <!-- Top Key Metrics Cards -->
+    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
+        <!-- Metric 1: Users -->
+        <div class="bg-white border border-gray-200 p-6 rounded-3xl shadow-sm hover:shadow-md transition space-y-2">
+            <div class="flex items-center justify-between text-gray-500">
+                <span class="text-xs font-semibold">کاربران ثبت‌نامی</span>
+                <div class="w-10 h-10 rounded-2xl bg-blue-50 text-blue-600 flex items-center justify-center">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"></path>
+                    </svg>
+                </div>
+            </div>
+            <div class="text-3xl font-black text-gray-900">{{ users_count }}</div>
+            <p class="text-[11px] text-gray-400">تعداد کل اعضای ثبت‌شده در پلتفرم</p>
+        </div>
+
+        <!-- Metric 2: Items -->
+        <div class="bg-white border border-gray-200 p-6 rounded-3xl shadow-sm hover:shadow-md transition space-y-2">
+            <div class="flex items-center justify-between text-gray-500">
+                <span class="text-xs font-semibold">کالاهای ثبت‌شده</span>
+                <div class="w-10 h-10 rounded-2xl bg-emerald-50 text-emerald-600 flex items-center justify-center">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"></path>
+                    </svg>
+                </div>
+            </div>
+            <div class="text-3xl font-black text-gray-900">{{ items_count }}</div>
+            <p class="text-[11px] text-emerald-700 font-medium">{{ active_items_count }} کالا فعال و قابل امانت</p>
+        </div>
+
+        <!-- Metric 3: Total Rentals -->
+        <div class="bg-white border border-gray-200 p-6 rounded-3xl shadow-sm hover:shadow-md transition space-y-2">
+            <div class="flex items-center justify-between text-gray-500">
+                <span class="text-xs font-semibold">مجموع امانت‌ها</span>
+                <div class="w-10 h-10 rounded-2xl bg-indigo-50 text-indigo-600 flex items-center justify-center">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"></path>
+                    </svg>
+                </div>
+            </div>
+            <div class="text-3xl font-black text-gray-900">{{ total_rentals }}</div>
+            <p class="text-[11px] text-gray-400">کل سفارش‌های ثبت‌شده در تمام وضعیت‌ها</p>
+        </div>
+
+        <!-- Metric 4: Total Commission -->
+        <div class="bg-white border border-gray-200 p-6 rounded-3xl shadow-sm hover:shadow-md transition space-y-2">
+            <div class="flex items-center justify-between text-gray-500">
+                <span class="text-xs font-semibold">مجموع کارمزد پلتفرم</span>
+                <div class="w-10 h-10 rounded-2xl bg-amber-50 text-amber-600 flex items-center justify-center">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                    </svg>
+                </div>
+            </div>
+            <div class="text-2xl sm:text-3xl font-black text-amber-700">
+                {{ total_commission|floatformat:0 }} <span class="text-xs font-normal text-gray-500">تومان</span>
+            </div>
+            <p class="text-[11px] text-gray-400">درآمد قطعی پلتفرم از سفارش‌های تکمیل‌شده (۱۵٪)</p>
+        </div>
+    </div>
+
+    <!-- Rentals Status Breakdown -->
+    <div class="bg-white border border-gray-200 rounded-3xl p-6 sm:p-8 shadow-sm space-y-6">
+        <div class="flex items-center justify-between border-b border-gray-100 pb-4">
+            <div>
+                <h2 class="text-lg font-bold text-gray-900">وضعیت چرخه حیات سفارش‌های امانت</h2>
+                <p class="text-xs text-gray-400 mt-0.5">توزیع سفارش‌ها به تفکیک مراحل فرآیندی ماشین وضعیت</p>
+            </div>
+            <span class="text-xs text-gray-500 font-medium">مجموع: {{ total_rentals }} سفارش</span>
+        </div>
+
+        <div class="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-3 text-center">
+            <!-- pending_payment -->
+            <div class="p-4 rounded-2xl bg-amber-50/70 border border-amber-100 space-y-1">
+                <span class="text-[11px] font-bold text-amber-800 block">در انتظار پرداخت</span>
+                <span class="text-2xl font-black text-amber-900">{{ rentals_by_status.pending_payment|default:0 }}</span>
+            </div>
+
+            <!-- confirmed -->
+            <div class="p-4 rounded-2xl bg-blue-50/70 border border-blue-100 space-y-1">
+                <span class="text-[11px] font-bold text-blue-800 block">تأییدشده (رزرو)</span>
+                <span class="text-2xl font-black text-blue-900">{{ rentals_by_status.confirmed|default:0 }}</span>
+            </div>
+
+            <!-- handed_over -->
+            <div class="p-4 rounded-2xl bg-purple-50/70 border border-purple-100 space-y-1">
+                <span class="text-[11px] font-bold text-purple-800 block">تحویل داده‌شده</span>
+                <span class="text-2xl font-black text-purple-900">{{ rentals_by_status.handed_over|default:0 }}</span>
+            </div>
+
+            <!-- returned -->
+            <div class="p-4 rounded-2xl bg-teal-50/70 border border-teal-100 space-y-1">
+                <span class="text-[11px] font-bold text-teal-800 block">بازگردانده‌شده</span>
+                <span class="text-2xl font-black text-teal-900">{{ rentals_by_status.returned|default:0 }}</span>
+            </div>
+
+            <!-- completed -->
+            <div class="p-4 rounded-2xl bg-emerald-50/70 border border-emerald-100 space-y-1">
+                <span class="text-[11px] font-bold text-emerald-800 block">تکمیل و تسویه‌شده</span>
+                <span class="text-2xl font-black text-emerald-900">{{ rentals_by_status.completed|default:0 }}</span>
+            </div>
+
+            <!-- disputed -->
+            <div class="p-4 rounded-2xl bg-rose-50/70 border border-rose-100 space-y-1">
+                <span class="text-[11px] font-bold text-rose-800 block">مورد اختلاف</span>
+                <span class="text-2xl font-black text-rose-900">{{ rentals_by_status.disputed|default:0 }}</span>
+            </div>
+
+            <!-- cancelled -->
+            <div class="p-4 rounded-2xl bg-gray-50 border border-gray-200 space-y-1">
+                <span class="text-[11px] font-bold text-gray-600 block">لغوشده</span>
+                <span class="text-2xl font-black text-gray-700">{{ rentals_by_status.cancelled|default:0 }}</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- Two Columns: Recent Disputes & Recent Rentals -->
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
+        <!-- Open Disputes Section -->
+        <div class="bg-white border border-gray-200 rounded-3xl p-6 shadow-sm space-y-4">
+            <div class="flex items-center justify-between pb-3 border-b border-gray-100">
+                <div class="flex items-center gap-2">
+                    <span class="w-2.5 h-2.5 rounded-full bg-rose-500 animate-pulse"></span>
+                    <h3 class="font-bold text-gray-900 text-sm">پرونده‌های اختلاف اخیر</h3>
+                </div>
+                <a href="{% url 'rentals:admin_dispute_list' %}" class="text-xs text-blue-600 hover:text-blue-700 font-semibold">
+                    مشاهده همه ({{ total_disputes_count }}) ←
+                </a>
+            </div>
+
+            <div class="space-y-3">
+                {% for disp in recent_disputes %}
+                    <div class="p-4 rounded-2xl border border-gray-100 bg-gray-50/70 hover:bg-gray-50 transition space-y-2">
+                        <div class="flex items-center justify-between text-xs">
+                            <span class="font-bold text-gray-900">
+                                اختلاف #{{ disp.pk }} — سفارش #{{ disp.rental_id }}
+                            </span>
+                            {% if disp.status == 'open' %}
+                                <span class="px-2 py-0.5 rounded-full bg-rose-100 text-rose-700 font-bold text-[10px]">باز و منتظر داوری</span>
+                            {% else %}
+                                <span class="px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-700 font-bold text-[10px]">مختومه</span>
+                            {% endif %}
+                        </div>
+                        <p class="text-xs text-gray-600 line-clamp-2 leading-relaxed">{{ disp.reason }}</p>
+                        <div class="flex items-center justify-between text-[11px] text-gray-400 pt-1 border-t border-gray-100">
+                            <span>ثبت توسط: {{ disp.opened_by.username }}</span>
+                            <div class="flex items-center gap-2">
+                                <span>{{ disp.created_at|date:"Y/m/d H:i" }}</span>
+                                {% if disp.status == 'open' %}
+                                    <a href="{% url 'rentals:admin_dispute_resolve' disp.pk %}" class="text-rose-600 font-bold hover:underline">
+                                        داوری و حل اختلاف ←
+                                    </a>
+                                {% endif %}
+                            </div>
+                        </div>
+                    </div>
+                {% empty %}
+                    <p class="text-xs text-gray-400 text-center py-6">هیچ پرونده اختلافی ثبت نشده است.</p>
+                {% endfor %}
+            </div>
+        </div>
+
+        <!-- Recent Rentals Section -->
+        <div class="bg-white border border-gray-200 rounded-3xl p-6 shadow-sm space-y-4">
+            <div class="flex items-center justify-between pb-3 border-b border-gray-100">
+                <h3 class="font-bold text-gray-900 text-sm">سفارش‌های امانت اخیر</h3>
+                <span class="text-xs text-gray-400">{{ total_rentals }} سفارش کل</span>
+            </div>
+
+            <div class="space-y-3">
+                {% for rent in recent_rentals %}
+                    <div class="p-4 rounded-2xl border border-gray-100 bg-gray-50/70 hover:bg-gray-50 transition space-y-2">
+                        <div class="flex items-center justify-between text-xs">
+                            <a href="{% url 'rentals:rental_detail' rent.pk %}" class="font-bold text-gray-900 hover:text-blue-600 transition">
+                                سفارش #{{ rent.pk }} — {{ rent.item.title }}
+                            </a>
+                            <span class="px-2 py-0.5 rounded-full bg-blue-50 text-blue-700 font-bold text-[10px]">
+                                {{ rent.get_status_display }}
+                            </span>
+                        </div>
+                        <div class="flex items-center justify-between text-xs text-gray-500">
+                            <span>مستأجر: {{ rent.renter.username }}</span>
+                            <span>مبلغ کل: {{ rent.rent_amount|add:rent.deposit_amount|floatformat:0 }} تومان</span>
+                        </div>
+                        <div class="flex items-center justify-between text-[11px] text-gray-400 pt-1 border-t border-gray-100">
+                            <span>کد رهگیری: {{ rent.tracking_code|default:"-" }}</span>
+                            <span>{{ rent.created_at|date:"Y/m/d H:i" }}</span>
+                        </div>
+                    </div>
+                {% empty %}
+                    <p class="text-xs text-gray-400 text-center py-6">هنوز سفارشی ثبت نشده است.</p>
+                {% endfor %}
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

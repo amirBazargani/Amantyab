@@ -15,4 +15,8 @@ urlpatterns = [
     path("<int:pk>/return/", views.mark_returned, name="mark_returned"),
     path("<int:pk>/confirm-return/", views.confirm_return, name="confirm_return"),
     path("<int:pk>/cancel/", views.cancel, name="cancel"),
+    path("<int:pk>/dispute/", views.dispute_open, name="dispute_open"),
+    path("dashboard/", views.admin_dashboard, name="admin_dashboard"),
+    path("disputes/", views.admin_dispute_list, name="admin_dispute_list"),
+    path("disputes/<int:pk>/resolve/", views.admin_dispute_resolve, name="admin_dispute_resolve"),
 ]

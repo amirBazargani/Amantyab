@@ -6,7 +6,7 @@ from django.core.exceptions import ValidationError
 from django.utils import timezone
 from django.utils.translation import gettext_lazy as _
 
-from .models import Rental
+from .models import Dispute, Rental
 from .services import has_overlap
 
 
@@ -176,3 +176,64 @@ class RentalRequestForm(forms.ModelForm):
                 )
 
         return cleaned_data
+
+
+class DisputeForm(forms.ModelForm):
+    class Meta:
+        model = Dispute
+        fields = ["reason"]
+        widgets = {
+            "reason": forms.Textarea(
+                attrs={
+                    "rows": 4,
+                    "placeholder": _("علت بروز اختلاف، خسارت وارده، عدم تحویل یا مغایرت را به طور کامل تشریح فرمایید..."),
+                    "class": "w-full rounded-xl border border-gray-300 px-3.5 py-2.5 text-sm focus:border-blue-500 focus:ring-2 focus:ring-blue-100 transition",
+                }
+            ),
+        }
+        labels = {
+            "reason": _("شرح علت اختلاف"),
+        }
+
+    def clean_reason(self):
+        reason = self.cleaned_data.get("reason", "").strip()
+        if not reason:
+            raise ValidationError(_("لطفاً علت بروز اختلاف را وارد نمایید."))
+        if len(reason) < 10:
+            raise ValidationError(_("شرح علت اختلاف باید حداقل شامل ۱۰ کاراکتر باشد."))
+        return reason
+
+
+class DisputeResolveForm(forms.ModelForm):
+    deposit_decision = forms.ChoiceField(
+        label=_("تصمیم‌گیری در مورد ودیعه"),
+        choices=Dispute.DepositDecision.choices,
+        widget=forms.RadioSelect(
+            attrs={
+                "class": "text-blue-600 focus:ring-blue-500",
+            }
+        ),
+    )
+
+    class Meta:
+        model = Dispute
+        fields = ["deposit_decision", "resolution_note"]
+        widgets = {
+            "resolution_note": forms.Textarea(
+                attrs={
+                    "rows": 3,
+                    "placeholder": _("توضیحات و مستندات رأی داوری برای اطلاع طرفین..."),
+                    "class": "w-full rounded-xl border border-gray-300 px-3.5 py-2.5 text-sm focus:border-blue-500 focus:ring-2 focus:ring-blue-100 transition",
+                }
+            ),
+        }
+        labels = {
+            "resolution_note": _("یادداشت و نتیجه‌گیری مدیر"),
+        }
+
+    def clean_deposit_decision(self):
+        decision = self.cleaned_data.get("deposit_decision")
+        if decision not in Dispute.DepositDecision.values:
+            raise ValidationError(_("لطفاً یک تصمیم معتبر برای ودیعه انتخاب کنید."))
+        return decision
+

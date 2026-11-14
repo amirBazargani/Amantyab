@@ -1,15 +1,17 @@
 from decimal import Decimal
 
 from django.contrib import messages
+from django.contrib.auth import get_user_model
 from django.contrib.auth.decorators import login_required
 from django.core.exceptions import PermissionDenied, ValidationError
+from django.db.models import Count, Q, Sum
 from django.shortcuts import get_object_or_404, redirect, render
 from django.views.decorators.http import require_POST
 from django.utils.translation import gettext_lazy as _
 
 from catalog.models import Item
-from .forms import RentalRequestForm
-from .models import Rental
+from .forms import DisputeForm, DisputeResolveForm, RentalRequestForm
+from .models import Dispute, Payment, Rental
 from .services import (
     calculate_price,
     can_transition,
@@ -19,6 +21,8 @@ from .services import (
     handover_rental,
     has_overlap,
     mark_returned_rental,
+    open_dispute,
+    resolve_dispute,
     simulate_payment,
 )
 
@@ -216,6 +220,10 @@ def rental_detail(request, pk):
         and (request.user.pk in (rental.renter_id, rental.item.owner_id))
     )
 
+    active_dispute = rental.disputes.filter(status=Dispute.Status.OPEN).first()
+    disputes = list(rental.disputes.select_related("opened_by", "resolved_by").order_by("-created_at"))
+    can_dispute = can_transition(rental, Rental.Status.DISPUTED, request.user) and not active_dispute
+
     context = {
         "rental": rental,
         "item": rental.item,
@@ -231,6 +239,9 @@ def rental_detail(request, pk):
         "can_mark_returned": can_transition(rental, Rental.Status.RETURNED, request.user),
         "can_confirm_return": can_transition(rental, Rental.Status.COMPLETED, request.user),
         "can_cancel": can_transition(rental, Rental.Status.CANCELLED, request.user),
+        "can_dispute": can_dispute,
+        "active_dispute": active_dispute,
+        "disputes": disputes,
     }
     return render(request, "rentals/rental_detail.html", context)
 
@@ -320,4 +331,200 @@ def cancel(request, pk):
         messages.error(request, str(e))
 
     return redirect("rentals:rental_detail", pk=rental.pk)
+
+
+@login_required
+def dispute_open(request, pk):
+    """
+    Allow renter or owner (or staff) to open a dispute
+    when rental is in handed_over or returned status.
+    """
+    rental = get_object_or_404(
+        Rental.objects.select_related("item", "item__owner", "renter"),
+        pk=pk,
+    )
+
+    if request.user.pk not in (rental.renter_id, rental.item.owner_id) and not request.user.is_staff:
+        raise PermissionDenied(_("شما مجاز به ثبت اختلاف برای این سفارش نمی‌باشید."))
+
+    if rental.status not in (Rental.Status.HANDED_OVER, Rental.Status.RETURNED):
+        messages.error(
+            request,
+            _("ثبت اختلاف تنها برای سفارش‌های در حال استفاده یا بازگردانده‌شده امکان‌پذیر است."),
+        )
+        return redirect("rentals:rental_detail", pk=rental.pk)
+
+    if rental.disputes.filter(status=Dispute.Status.OPEN).exists():
+        messages.warning(
+            request,
+            _("یک پرونده اختلاف فعال برای این سفارش در جریان است."),
+        )
+        return redirect("rentals:rental_detail", pk=rental.pk)
+
+    if request.method == "POST":
+        form = DisputeForm(request.POST)
+        if form.is_valid():
+            try:
+                open_dispute(rental, request.user, form.cleaned_data["reason"])
+                messages.success(
+                    request,
+                    _("اختلاف با موفقیت ثبت شد و پرونده جهت رسیدگی به مدیر سامانه ارجاع داده شد."),
+                )
+                return redirect("rentals:rental_detail", pk=rental.pk)
+            except (ValidationError, PermissionDenied) as e:
+                messages.error(request, e.messages[0] if hasattr(e, "messages") else str(e))
+    else:
+        form = DisputeForm()
+
+    context = {
+        "rental": rental,
+        "item": rental.item,
+        "form": form,
+    }
+    return render(request, "rentals/dispute_open.html", context)
+
+
+@login_required
+def admin_dashboard(request):
+    """
+    Staff-only dashboard showing platform overview and counts:
+    users, items, rentals by status, total commission, and disputes.
+    """
+    if not request.user.is_staff:
+        raise PermissionDenied(_("تنها مدیران سامانه مجاز به دسترسی به این بخش می‌باشند."))
+
+    User = get_user_model()
+    users_count = User.objects.count()
+    items_count = Item.objects.count()
+    active_items_count = Item.objects.filter(is_active=True).count()
+    total_rentals = Rental.objects.count()
+
+    rentals_by_status = {
+        status: Rental.objects.filter(status=status).count()
+        for status, _ in Rental.Status.choices
+    }
+
+    # Total commission from completed rentals
+    total_commission = (
+        Rental.objects.filter(status=Rental.Status.COMPLETED).aggregate(
+            total=Sum("commission_amount")
+        )["total"]
+        or Decimal("0")
+    )
+
+    open_disputes_count = Dispute.objects.filter(status=Dispute.Status.OPEN).count()
+    resolved_disputes_count = Dispute.objects.filter(status=Dispute.Status.RESOLVED).count()
+    total_disputes_count = Dispute.objects.count()
+
+    recent_rentals = Rental.objects.select_related("item", "renter").order_by("-created_at")[:6]
+    recent_disputes = Dispute.objects.select_related("rental", "opened_by").order_by("-created_at")[:6]
+
+    context = {
+        "users_count": users_count,
+        "items_count": items_count,
+        "active_items_count": active_items_count,
+        "total_rentals": total_rentals,
+        "rentals_by_status": rentals_by_status,
+        "status_choices": Rental.Status.choices,
+        "total_commission": total_commission,
+        "open_disputes_count": open_disputes_count,
+        "resolved_disputes_count": resolved_disputes_count,
+        "total_disputes_count": total_disputes_count,
+        "recent_rentals": recent_rentals,
+        "recent_disputes": recent_disputes,
+    }
+    return render(request, "rentals/admin_dashboard.html", context)
+
+
+@login_required
+def admin_dispute_list(request):
+    """
+    Staff-only view to list and filter all disputes.
+    """
+    if not request.user.is_staff:
+        raise PermissionDenied(_("تنها مدیران سامانه مجاز به دسترسی به این بخش می‌باشند."))
+
+    status_filter = request.GET.get("status", "").strip()
+    disputes_qs = Dispute.objects.select_related(
+        "rental",
+        "rental__item",
+        "rental__item__owner",
+        "rental__renter",
+        "opened_by",
+        "resolved_by",
+    ).order_by("-created_at")
+
+    if status_filter in Dispute.Status.values:
+        disputes_qs = disputes_qs.filter(status=status_filter)
+
+    open_count = Dispute.objects.filter(status=Dispute.Status.OPEN).count()
+    resolved_count = Dispute.objects.filter(status=Dispute.Status.RESOLVED).count()
+    total_count = Dispute.objects.count()
+
+    context = {
+        "disputes": disputes_qs,
+        "status_filter": status_filter,
+        "open_count": open_count,
+        "resolved_count": resolved_count,
+        "total_count": total_count,
+    }
+    return render(request, "rentals/admin_dispute_list.html", context)
+
+
+@login_required
+def admin_dispute_resolve(request, pk):
+    """
+    Staff-only view to review dispute details and resolve with a deposit decision.
+    Creates matching payment rows and completes the rental.
+    """
+    if not request.user.is_staff:
+        raise PermissionDenied(_("تنها مدیران سامانه مجاز به دسترسی به این بخش می‌باشند."))
+
+    dispute = get_object_or_404(
+        Dispute.objects.select_related(
+            "rental",
+            "rental__item",
+            "rental__item__owner",
+            "rental__renter",
+            "opened_by",
+            "resolved_by",
+        ),
+        pk=pk,
+    )
+    rental = dispute.rental
+
+    if request.method == "POST":
+        if dispute.status != Dispute.Status.OPEN:
+            messages.error(request, _("این پرونده قبلاً تعیین تکلیف و مختومه شده است."))
+            return redirect("rentals:admin_dispute_list")
+
+        form = DisputeResolveForm(request.POST, instance=dispute)
+        if form.is_valid():
+            try:
+                resolve_dispute(
+                    dispute,
+                    request.user,
+                    form.cleaned_data["deposit_decision"],
+                    form.cleaned_data["resolution_note"],
+                )
+                messages.success(
+                    request,
+                    _("پرونده اختلاف با موفقیت داوری و مختومه شد و تراکنش‌های مربوطه صادر گردید."),
+                )
+                return redirect("rentals:admin_dispute_list")
+            except (ValidationError, PermissionDenied) as e:
+                messages.error(request, e.messages[0] if hasattr(e, "messages") else str(e))
+    else:
+        form = DisputeResolveForm(instance=dispute)
+
+    payments = rental.payments.order_by("created_at")
+
+    context = {
+        "dispute": dispute,
+        "rental": rental,
+        "form": form,
+        "payments": payments,
+    }
+    return render(request, "rentals/admin_dispute_resolve.html", context)
+
 
