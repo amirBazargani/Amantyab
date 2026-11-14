@@ -33,7 +33,7 @@ def rental_request(request, item_id):
     Renter requests to rent an item. Validates dates, checks overlap,
     calculates prices and creates a pending_payment rental.
     """
-    item = get_object_or_404(Item, pk=item_id, is_active=True)
+    item = get_object_or_404(Item.objects.active(), pk=item_id)
 
     # Item owner cannot rent their own item
     if item.owner_id == request.user.pk:
@@ -154,15 +154,15 @@ def rental_receipt(request, pk):
 def my_rentals(request):
     """
     List of rentals requested by the logged-in user as renter.
-    Optional filter by status query param.
+    Optional filter by status query param using RentalQuerySet.
     """
-    rentals = Rental.objects.filter(renter=request.user).select_related(
+    rentals = Rental.objects.for_renter(request.user).select_related(
         "item", "item__owner"
     ).order_by("-created_at")
 
     selected_status = request.GET.get("status", "").strip()
     if selected_status and selected_status in Rental.Status.values:
-        rentals = rentals.filter(status=selected_status)
+        rentals = rentals.with_status(selected_status)
 
     context = {
         "rentals": rentals,
@@ -176,15 +176,15 @@ def my_rentals(request):
 def owner_rentals(request):
     """
     List of rental requests for items owned by the logged-in user.
-    Optional filter by status query param.
+    Optional filter by status query param using RentalQuerySet.
     """
-    rentals = Rental.objects.filter(item__owner=request.user).select_related(
+    rentals = Rental.objects.for_owner(request.user).select_related(
         "item", "renter"
     ).order_by("-created_at")
 
     selected_status = request.GET.get("status", "").strip()
     if selected_status and selected_status in Rental.Status.values:
-        rentals = rentals.filter(status=selected_status)
+        rentals = rentals.with_status(selected_status)
 
     context = {
         "rentals": rentals,
@@ -396,17 +396,17 @@ def admin_dashboard(request):
     User = get_user_model()
     users_count = User.objects.count()
     items_count = Item.objects.count()
-    active_items_count = Item.objects.filter(is_active=True).count()
+    active_items_count = Item.objects.active().count()
     total_rentals = Rental.objects.count()
 
     rentals_by_status = {
-        status: Rental.objects.filter(status=status).count()
+        status: Rental.objects.with_status(status).count()
         for status, _ in Rental.Status.choices
     }
 
     # Total commission from completed rentals
     total_commission = (
-        Rental.objects.filter(status=Rental.Status.COMPLETED).aggregate(
+        Rental.objects.with_status(Rental.Status.COMPLETED).aggregate(
             total=Sum("commission_amount")
         )["total"]
         or Decimal("0")

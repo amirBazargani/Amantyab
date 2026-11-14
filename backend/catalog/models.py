@@ -1,5 +1,6 @@
-from decimal import Decimal
+from decimal import Decimal, InvalidOperation
 
+from django.apps import apps
 from django.conf import settings
 from django.core.exceptions import ValidationError
 from django.core.validators import MaxValueValidator, MinValueValidator
@@ -29,7 +30,89 @@ class Category(models.Model):
         return self.name
 
 
+class ItemQuerySet(models.QuerySet):
+    def active(self):
+        """Return only active items available to the public."""
+        return self.filter(is_active=True)
+
+    def in_city(self, city):
+        """Filter items by city name (case-insensitive substring)."""
+        if not city or not str(city).strip():
+            return self
+        return self.filter(city__icontains=str(city).strip())
+
+    def in_category(self, category):
+        """
+        Filter items by category instance, primary key, or slug.
+        Includes all descendant child categories when applicable.
+        """
+        if not category:
+            return self
+
+        if isinstance(category, Category):
+            cat_ids = [category.pk] + list(category.children.values_list("pk", flat=True))
+            return self.filter(category_id__in=cat_ids)
+
+        cat_str = str(category).strip()
+        if not cat_str:
+            return self
+
+        if isinstance(category, int) or cat_str.isdigit():
+            cat_id = int(cat_str)
+            cat = Category.objects.filter(pk=cat_id).prefetch_related("children").first()
+            if cat:
+                cat_ids = [cat.pk] + list(cat.children.values_list("pk", flat=True))
+                return self.filter(category_id__in=cat_ids)
+            return self.filter(category_id=cat_id)
+
+        cat = Category.objects.filter(slug=cat_str).prefetch_related("children").first()
+        if cat:
+            cat_ids = [cat.pk] + list(cat.children.values_list("pk", flat=True))
+            return self.filter(category_id__in=cat_ids)
+        return self.filter(category__slug=cat_str)
+
+    def search(self, q):
+        """Search items by title, description, or brand."""
+        if not q or not str(q).strip():
+            return self
+        query = str(q).strip()
+        return self.filter(
+            models.Q(title__icontains=query)
+            | models.Q(description__icontains=query)
+            | models.Q(brand__icontains=query)
+        )
+
+    def price_up_to(self, max_price):
+        """Filter items with daily price less than or equal to max_price."""
+        if max_price is None or str(max_price).strip() == "":
+            return self
+        try:
+            val = Decimal(str(max_price))
+            if val > 0:
+                return self.filter(daily_price__lte=val)
+        except (InvalidOperation, ValueError, TypeError):
+            pass
+        return self
+
+    def available_between(self, start, end):
+        """
+        Return items that have no overlapping blocking (non-cancelled) rentals
+        between start and end.
+        """
+        if not start or not end:
+            return self
+        Rental = apps.get_model("rentals", "Rental")
+        busy_item_ids = (
+            Rental.objects.blocking()
+            .overlapping(start=start, end=end)
+            .values_list("item_id", flat=True)
+        )
+        return self.exclude(pk__in=busy_item_ids)
+
+
 class Item(models.Model):
+    objects = ItemQuerySet.as_manager()
+
     class Condition(models.TextChoices):
         NEW = "new", _("New")
         LIKE_NEW = "like_new", _("Like new")

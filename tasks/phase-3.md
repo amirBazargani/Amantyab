@@ -1,10 +1,11 @@
 # PHASE 3 — managers, session & cookie, logging
 
-- [ ] **P3-01 Managers and QuerySets**
+- [x] **P3-01 Managers and QuerySets**
   - Files: `catalog/models.py` (ItemQuerySet: `active()`, `in_city()`, `in_category()`, `search(q)`, `price_up_to()`, `available_between(start,end)`; `Item.objects = ItemQuerySet.as_manager()`), `rentals/models.py` (RentalQuerySet: `blocking()`, `overlapping(item,start,end)`, `for_renter()`, `for_owner()`, `with_status()`, `ending_soon(hours)` (handed_over rentals whose end_at is within now..now+hours and reminder_sent_at is null)), `reviews/models.py` (ReviewQuerySet: `for_user()`, `average_rating()`), `accounts/models.py` (UserManager if needed for create_user with email).
   - Goal: move ad-hoc ORM from views/services into these. Views get shorter. Document each in REPORT §4 with "why".
   - Acceptance: no query-building logic left in templates; `item_list` uses chained queryset methods; behaviour identical to Phase 2 (re-run QA-P2).
   - Commits: `refactor(catalog): add Item queryset methods` · `refactor(rentals): add Rental queryset methods` · `refactor(reviews): add Review queryset methods` · `docs: describe managers in report`
+  - Done notes: Implemented custom ItemQuerySet, RentalQuerySet, and ReviewQuerySet with full method suites and attached via as_manager(); refactored item_list to chained query methods; refactored rentals/reviews views and services; added 15 unit tests (total 133 tests passing); documented §4 in docs/REPORT.md; updated docs/DEFENSE.md and docs/COMMIT-LOG.md.
 
 - [ ] **P3-01A Rental-ending reminder (email + SMS)**
   - Files: `rentals/management/commands/send_rental_reminders.py`, `config/settings.py` (`RENTAL_REMINDER_HOURS`, default 3), `templates/notifications/rental_ending_soon_{subject,body}.txt`, README (how to schedule).

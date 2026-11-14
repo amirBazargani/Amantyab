@@ -4,7 +4,25 @@ from django.db import models
 from django.utils.translation import gettext_lazy as _
 
 
+class ReviewQuerySet(models.QuerySet):
+    def for_user(self, user, role=None):
+        """Filter reviews received by a given user, optionally filtering by reviewee_role."""
+        if not user:
+            return self.none()
+        qs = self.filter(reviewee=user)
+        if role:
+            qs = qs.filter(reviewee_role=role)
+        return qs
+
+    def average_rating(self):
+        """Calculate and return the average rating score as a float (or None if no reviews)."""
+        result = self.aggregate(models.Avg("rating"))["rating__avg"]
+        return float(result) if result is not None else None
+
+
 class Review(models.Model):
+    objects = ReviewQuerySet.as_manager()
+
     class Role(models.TextChoices):
         OWNER = "owner", _("Owner")
         RENTER = "renter", _("Renter")

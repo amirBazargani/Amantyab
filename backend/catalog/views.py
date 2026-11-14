@@ -19,46 +19,26 @@ from .models import Category, Item
 def item_list(request):
     """
     Catalog browse view with filtering by search term (q), category, city, and max daily price.
-    Only active items are shown to the public.
+    Only active items are shown to the public. Uses chained ItemQuerySet methods.
     """
-    queryset = (
-        Item.objects.filter(is_active=True)
-        .select_related("category", "owner")
-        .prefetch_related("images")
-    )
-
     q = request.GET.get("q", "").strip()
     category_param = request.GET.get("category", "").strip()
     city = request.GET.get("city", "").strip()
     max_price_param = request.GET.get("max_price", "").strip()
 
-    if q:
-        queryset = queryset.filter(
-            Q(title__icontains=q)
-            | Q(description__icontains=q)
-            | Q(brand__icontains=q)
-        )
-
-    if category_param:
-        if category_param.isdigit():
-            queryset = queryset.filter(category_id=int(category_param))
-        else:
-            queryset = queryset.filter(category__slug=category_param)
-
-    if city:
-        queryset = queryset.filter(city__icontains=city)
-
-    if max_price_param:
-        try:
-            max_price = Decimal(max_price_param)
-            if max_price > 0:
-                queryset = queryset.filter(daily_price__lte=max_price)
-        except (InvalidOperation, ValueError):
-            pass
+    queryset = (
+        Item.objects.active()
+        .search(q)
+        .in_category(category_param)
+        .in_city(city)
+        .price_up_to(max_price_param)
+        .select_related("category", "owner")
+        .prefetch_related("images")
+    )
 
     categories = Category.objects.all().order_by("name")
     cities = (
-        Item.objects.filter(is_active=True)
+        Item.objects.active()
         .values_list("city", flat=True)
         .distinct()
         .order_by("city")
@@ -105,8 +85,7 @@ def item_detail(request, pk):
         .select_related("reviewer")
         .order_by("-created_at")
     )
-    review_stats = reviews.aggregate(avg=Avg("rating"))
-    avg_rating = review_stats["avg"]
+    avg_rating = reviews.average_rating()
     review_count = reviews.count()
 
     context = {

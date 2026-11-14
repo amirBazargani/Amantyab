@@ -79,11 +79,7 @@ def has_overlap(item, start_at, end_at, exclude_rental_id=None):
     if not item or not start_at or not end_at:
         return False
 
-    qs = Rental.objects.filter(
-        item=item,
-        start_at__lt=end_at,
-        end_at__gt=start_at,
-    ).exclude(status=Rental.Status.CANCELLED)
+    qs = Rental.objects.blocking().overlapping(item=item, start=start_at, end=end_at)
 
     if exclude_rental_id:
         qs = qs.exclude(pk=exclude_rental_id)

@@ -1,13 +1,76 @@
+from datetime import timedelta
 from decimal import Decimal
 
 from django.conf import settings
 from django.core.exceptions import ValidationError
 from django.core.validators import MaxValueValidator, MinValueValidator
 from django.db import models
+from django.utils import timezone
 from django.utils.translation import gettext_lazy as _
 
 
+class RentalQuerySet(models.QuerySet):
+    def blocking(self):
+        """Return non-cancelled rentals that block item availability."""
+        return self.exclude(status=self.model.Status.CANCELLED)
+
+    def overlapping(self, item=None, start=None, end=None):
+        """
+        Filter rentals overlapping a date range [start, end] and optionally for a specific item.
+        Two intervals [s1, e1] and [s2, e2] overlap when s1 < e2 and e1 > s2.
+        """
+        qs = self
+        if item is not None:
+            if isinstance(item, (int, str)) and str(item).isdigit():
+                qs = qs.filter(item_id=int(item))
+            else:
+                qs = qs.filter(item=item)
+        if start is not None and end is not None:
+            qs = qs.filter(start_at__lt=end, end_at__gt=start)
+        elif start is not None:
+            qs = qs.filter(end_at__gt=start)
+        elif end is not None:
+            qs = qs.filter(start_at__lt=end)
+        return qs
+
+    def for_renter(self, user):
+        """Return rentals requested by the specified user as renter."""
+        if not user:
+            return self.none()
+        return self.filter(renter=user)
+
+    def for_owner(self, user):
+        """Return rentals for items owned by the specified user."""
+        if not user:
+            return self.none()
+        return self.filter(item__owner=user)
+
+    def with_status(self, status):
+        """Filter rentals by status or collection of statuses."""
+        if not status:
+            return self
+        if isinstance(status, (list, tuple, set)):
+            return self.filter(status__in=status)
+        return self.filter(status=status)
+
+    def ending_soon(self, hours=3):
+        """
+        Return handed_over rentals whose end_at is within now..now+hours
+        and reminder_sent_at is null.
+        """
+        now = timezone.now()
+        cutoff = now + timedelta(hours=int(hours))
+        return self.filter(
+            status=self.model.Status.HANDED_OVER,
+            reminder_sent_at__isnull=True,
+            end_at__gte=now,
+            end_at__lte=cutoff,
+        )
+
+
 class Rental(models.Model):
+    objects = RentalQuerySet.as_manager()
+
     class DeliveryMethod(models.TextChoices):
         PICKUP = "pickup", _("Pickup")
         COURIER = "courier", _("Courier")
@@ -161,11 +224,10 @@ class Rental(models.Model):
                 )
 
         if hasattr(self, "item") and self.item_id and self.start_at and self.end_at:
-            overlapping_qs = Rental.objects.filter(
-                item_id=self.item_id,
-                start_at__lt=self.end_at,
-                end_at__gt=self.start_at,
-            ).exclude(status=self.Status.CANCELLED)
+            overlapping_qs = (
+                Rental.objects.blocking()
+                .overlapping(item=self.item_id, start=self.start_at, end=self.end_at)
+            )
 
             if self.pk:
                 overlapping_qs = overlapping_qs.exclude(pk=self.pk)
