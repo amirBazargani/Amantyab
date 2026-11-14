@@ -93,18 +93,19 @@ def profile_edit_view(request):
 def public_profile_view(request, username):
     profile_user = get_object_or_404(User, username=username)
     items = (
-        profile_user.items.filter(is_active=True)
+        profile_user.items.active()
         .prefetch_related("images")
         .order_by("-created_at")
     )
 
     received_reviews = (
-        profile_user.received_reviews.select_related("reviewer", "rental", "rental__item")
+        Review.objects.for_user(profile_user)
+        .select_related("reviewer", "rental", "rental__item")
         .order_by("-created_at")
     )
-    overall_avg = received_reviews.aggregate(avg=Avg("rating"))["avg"]
-    owner_avg = received_reviews.filter(reviewee_role=Review.Role.OWNER).aggregate(avg=Avg("rating"))["avg"]
-    renter_avg = received_reviews.filter(reviewee_role=Review.Role.RENTER).aggregate(avg=Avg("rating"))["avg"]
+    overall_avg = received_reviews.average_rating()
+    owner_avg = received_reviews.for_user(profile_user, role=Review.Role.OWNER).average_rating()
+    renter_avg = received_reviews.for_user(profile_user, role=Review.Role.RENTER).average_rating()
 
     return render(
         request,
