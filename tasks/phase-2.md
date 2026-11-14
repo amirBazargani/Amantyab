@@ -91,11 +91,12 @@ Each app has its own `urls.py` with `app_name`; root `config/urls.py` includes t
   - Commit: `feat(rentals): add disputes and admin dashboard`
   - Done notes: Implemented DisputeForm and DisputeResolveForm with custom widgets; implemented open_dispute and resolve_dispute atomic services supporting all 3 deposit decisions (return_to_renter, give_to_owner, split) and creating matching Payment rows; implemented dispute_open view allowing participants to open disputes on handed_over/returned rentals; implemented staff-only admin views (admin_dashboard with platform counts/commission, admin_dispute_list with filters, admin_dispute_resolve) enforcing HTTP 403 for non-staff; created responsive RTL Tailwind templates and updated rental_detail and navbar; verified with 52 automated tests and interactive Django shell QA covering all acceptance criteria.
 
-- [ ] **P2-09 Test data entry**
+- [x] **P2-09 Test data entry**
   - Files: `core/management/commands/seed_demo.py`.
   - Goal: idempotent command: 1 admin, 8 users, 6 categories, 25 items (with city/neighborhood variety), rentals in EVERY status, reviews, 2 conversations, 1 open and 1 resolved dispute. Print the credentials. Placeholder images generated with Pillow. Also: every user gets a fake phone `0912xxxxxxx`; at least 10 items get coordinates (Tehran, Tabriz, Isfahan neighbourhoods) and address_text; one `handed_over` rental ends in about 2 hours (for the reminder demo) and another ends in 3 days; one courier rental has a delivery point.
   - Acceptance: running it twice does not duplicate; every page of the site has data to show.
   - Commit: `feat(core): add seed_demo management command`
+  - Done notes: Implemented idempotent seed_demo management command in core/management/commands/seed_demo.py; created 1 admin and 8 regular users with standard Iranian mobile phones (0912xxxxxxx) and demo1234 credentials; created 6 categories and 25 items across 5 cities with Pillow-generated placeholder images and 15 items with geo coordinates; populated rentals in all statuses including reminder demo ending in ~2h, courier rental with handover coordinates, 25 payments, 2-way reviews, 2 chat conversations, and 1 open + 1 resolved dispute; verified idempotency with repeated runs, all 118 unit tests passing, and HTTP 200 checks on all 10 core pages.
 
 - [ ] **P2-10 Phase 2 wrap-up**
   - Files: `docs/REPORT.md` §5 (views table), `docs/DEFENSE.md`, `docs/QA-P2.md` (manual checklist: one line per page/action).
