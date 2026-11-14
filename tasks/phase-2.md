@@ -98,9 +98,10 @@ Each app has its own `urls.py` with `app_name`; root `config/urls.py` includes t
   - Commit: `feat(core): add seed_demo management command`
   - Done notes: Implemented idempotent seed_demo management command in core/management/commands/seed_demo.py; created 1 admin and 8 regular users with standard Iranian mobile phones (0912xxxxxxx) and demo1234 credentials; created 6 categories and 25 items across 5 cities with Pillow-generated placeholder images and 15 items with geo coordinates; populated rentals in all statuses including reminder demo ending in ~2h, courier rental with handover coordinates, 25 payments, 2-way reviews, 2 chat conversations, and 1 open + 1 resolved dispute; verified idempotency with repeated runs, all 118 unit tests passing, and HTTP 200 checks on all 10 core pages.
 
-- [ ] **P2-10 Phase 2 wrap-up**
+- [x] **P2-10 Phase 2 wrap-up**
   - Files: `docs/REPORT.md` §5 (views table), `docs/DEFENSE.md`, `docs/QA-P2.md` (manual checklist: one line per page/action).
   - Then `/phase-review`.
+  - Done notes: Fully documented all 31 views across all 6 applications in docs/REPORT.md §5 with URL patterns, names, methods, permissions, templates, and descriptions; created docs/QA-P2.md with 48 granular manual QA checklist items covering every page, action, and permission level; added defense questions in docs/DEFENSE.md covering view architecture, IDOR/CSRF security, and quality assurance; verified all 118 unit and integration tests passing.
 
 ### Phase 2 deliverables checklist
 - [ ] every app has urls + views + templates + forms as listed
