@@ -19,3 +19,35 @@ End of each phase: `/phase-review`.
 - `docs/` — STATE, DOMAIN, PROCESSES, DECISIONS, COMMIT-LOG, DEFENSE, REPORT
 - `tasks/phase-1..4.md` — every task with files, acceptance, commits
 - `backend/`, `frontend/`, `db_backup/` — created by the agent during the tasks
+
+## Scheduling Background Commands
+
+### Rental Ending Reminder (`send_rental_reminders`)
+The platform includes an automated reminder command to notify renters via email and SMS before their rental period expires:
+
+```bash
+# Run once with default hours (from RENTAL_REMINDER_HOURS in settings, default: 3):
+python manage.py send_rental_reminders
+
+# Run once checking up to 5 hours ahead:
+python manage.py send_rental_reminders --hours 5
+
+# Run continuously as a background daemon (polls every 60 seconds):
+python manage.py send_rental_reminders --loop --interval 60
+```
+
+#### Linux / macOS (cron)
+Add an entry to crontab (`crontab -e`) to run periodically (e.g. every 15 minutes):
+```cron
+*/15 * * * * cd /path/to/project/backend && /path/to/project/.venv/bin/python manage.py send_rental_reminders >> /path/to/project/logs/reminders.log 2>&1
+```
+
+#### Windows (Task Scheduler)
+Create a scheduled task via Command Prompt or PowerShell:
+```cmd
+schtasks /create /tn "AmanatyabReminder" /tr "C:\path\to\project\.venv\Scripts\python.exe C:\path\to\project\backend\manage.py send_rental_reminders" /sc minute /mo 15
+```
+Or run as a persistent background service using the `--loop` flag:
+```cmd
+C:\path\to\project\.venv\Scripts\python.exe C:\path\to\project\backend\manage.py send_rental_reminders --loop --interval 60
+```
