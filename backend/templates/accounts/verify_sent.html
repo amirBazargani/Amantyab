@@ -1,0 +1,78 @@
+{% extends "base.html" %}
+
+{% block title %}تایید آدرس ایمیل | امانت‌یاب{% endblock %}
+
+{% block content %}
+<div class="max-w-lg mx-auto my-12 px-4">
+    <div class="bg-white p-8 rounded-2xl shadow-sm border border-gray-200 text-center">
+        {% if status == "expired" %}
+            <div class="w-16 h-16 mx-auto mb-4 bg-amber-100 rounded-full flex items-center justify-center text-amber-600">
+                <svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                </svg>
+            </div>
+            <h1 class="text-2xl font-bold text-gray-900 mb-2">لینک تایید منقضی شده است</h1>
+            <p class="text-sm text-gray-600 mb-6 leading-relaxed">
+                اعتبار لینک‌های تایید ایمیل ۲۴ ساعت است. لینک استفاده‌شده منقضی شده است. می‌توانید با زدن دکمه زیر، یک لینک تایید جدید دریافت کنید.
+            </p>
+        {% elif status == "invalid" %}
+            <div class="w-16 h-16 mx-auto mb-4 bg-red-100 rounded-full flex items-center justify-center text-red-600">
+                <svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path>
+                </svg>
+            </div>
+            <h1 class="text-2xl font-bold text-gray-900 mb-2">لینک نامعتبر است</h1>
+            <p class="text-sm text-gray-600 mb-6 leading-relaxed">
+                این لینک تایید نامعتبر است یا قبلاً دستکاری شده است. لطفاً برای دریافت لینک معتبر، درخواست ارسال مجدد دهید.
+            </p>
+        {% else %}
+            <div class="w-16 h-16 mx-auto mb-4 bg-blue-100 rounded-full flex items-center justify-center text-blue-600">
+                <svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"></path>
+                </svg>
+            </div>
+            <h1 class="text-2xl font-bold text-gray-900 mb-2">لینک تایید ارسال شد</h1>
+            <p class="text-sm text-gray-600 mb-4 leading-relaxed">
+                یک ایمیل حاوی لینک تایید برای آدرس ایمیل شما
+                {% if user.email %}
+                    (<span class="font-semibold text-gray-800" dir="ltr">{{ user.email }}</span>)
+                {% endif %}
+                ارسال گردید.
+            </p>
+            <p class="text-xs text-gray-500 mb-6 leading-relaxed">
+                این لینک به مدت <strong>۲۴ ساعت</strong> معتبر است. لطفاً صندوق ورودی (و همچنین پوشه هرزنامه/Spam) خود را بررسی کنید.
+            </p>
+        {% endif %}
+
+        {% if user.is_authenticated %}
+            <form method="post" action="{% url 'accounts:resend_verification' %}" class="mb-6">
+                {% csrf_token %}
+                <button type="submit" class="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-medium py-2.5 px-4 rounded-xl transition duration-150 flex items-center justify-center gap-2">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path>
+                    </svg>
+                    ارسال مجدد ایمیل تایید
+                </button>
+            </form>
+        {% else %}
+            <div class="mb-6">
+                <a href="{% url 'accounts:login' %}?next={% url 'accounts:resend_verification' %}" class="inline-block w-full bg-emerald-600 hover:bg-emerald-700 text-white font-medium py-2.5 px-4 rounded-xl transition duration-150">
+                    ورود به حساب کاربری برای ارسال مجدد
+                </a>
+            </div>
+        {% endif %}
+
+        <div class="flex items-center justify-center gap-4 text-sm">
+            {% if user.is_authenticated %}
+                <a href="{% url 'accounts:profile' %}" class="text-emerald-700 hover:text-emerald-800 font-medium">
+                    مشاهده پروفایل
+                </a>
+                <span class="text-gray-300">|</span>
+            {% endif %}
+            <a href="{% url 'catalog:item_list' %}" class="text-gray-600 hover:text-gray-800">
+                مرور کالاها
+            </a>
+        </div>
+    </div>
+</div>
+{% endblock %}

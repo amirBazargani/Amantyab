@@ -538,12 +538,14 @@ class RentalViewsTestCase(TestCase):
             email="viewowner@test.com",
             password="StrongPassword123!",
             phone="09121111117",
+            is_email_verified=True,
         )
         self.renter = User.objects.create_user(
             username="viewrenter",
             email="viewrenter@test.com",
             password="StrongPassword123!",
             phone="09122222228",
+            is_email_verified=True,
         )
         self.stranger = User.objects.create_user(
             username="viewstranger",

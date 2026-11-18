@@ -1,10 +1,12 @@
 from decimal import Decimal
 from unittest.mock import patch
 
+from django.core import mail
 from django.contrib.auth import get_user_model
 from django.test import TestCase
 from django.urls import reverse
 
+from accounts.tokens import generate_verification_token, verify_token
 from catalog.models import Category, Item
 from core.models import NotificationLog
 
@@ -420,5 +422,112 @@ class AccountsLoggingTests(TestCase):
             any("User logged out: user_id=" in msg for msg in cm_logout.output),
             f"Expected logout log in {cm_logout.output}",
         )
+
+
+class EmailVerificationTests(TestCase):
+    def setUp(self):
+        self.user = User.objects.create_user(
+            username="verifyuser",
+            email="verifyuser@example.com",
+            password="StrongPassword123!",
+            phone="09123456789",
+            is_email_verified=False,
+        )
+
+    def test_generate_and_verify_token_success(self):
+        token = generate_verification_token(self.user)
+        user, err = verify_token(token)
+        self.assertIsNone(err)
+        self.assertEqual(user, self.user)
+
+    def test_verify_token_expired(self):
+        token = generate_verification_token(self.user)
+        user, err = verify_token(token, max_age=-1)
+        self.assertIsNone(user)
+        self.assertEqual(err, "expired")
+
+    def test_verify_token_invalid_or_tampered(self):
+        token = generate_verification_token(self.user) + "tampered"
+        user, err = verify_token(token)
+        self.assertIsNone(user)
+        self.assertEqual(err, "invalid")
+
+    def test_signup_email_contains_verification_link_and_sms_is_plain(self):
+        signup_url = reverse("accounts:signup")
+        res = self.client.post(
+            signup_url,
+            {
+                "username": "emailcheckuser",
+                "email": "emailcheck@example.com",
+                "phone": "09121234567",
+                "password1": "SecurePass1234!",
+                "password2": "SecurePass1234!",
+            },
+            follow=True,
+        )
+        self.assertEqual(res.status_code, 200)
+        new_user = User.objects.get(username="emailcheckuser")
+        self.assertFalse(new_user.is_email_verified)
+
+        email_log = NotificationLog.objects.get(user=new_user, channel="email", event="signup_confirmation")
+        sms_log = NotificationLog.objects.get(user=new_user, channel="sms", event="signup_confirmation")
+
+        self.assertIn("verify-email", email_log.body)
+        self.assertNotIn("verify-email", sms_log.body)
+
+    def test_verify_email_view_success(self):
+        token = generate_verification_token(self.user)
+        url = reverse("accounts:verify_email", kwargs={"token": token})
+        res = self.client.get(url, follow=True)
+        self.assertEqual(res.status_code, 200)
+        self.user.refresh_from_db()
+        self.assertTrue(self.user.is_email_verified)
+
+    def test_verify_email_view_expired_link(self):
+        token = generate_verification_token(self.user)
+        with patch("accounts.views.verify_token", return_value=(None, "expired")):
+            url = reverse("accounts:verify_email", kwargs={"token": token})
+            res = self.client.get(url)
+            self.assertEqual(res.status_code, 400)
+            self.assertContains(res, "لینک تایید منقضی شده است", status_code=400)
+        self.user.refresh_from_db()
+        self.assertFalse(self.user.is_email_verified)
+
+    def test_verify_email_view_invalid_link(self):
+        url = reverse("accounts:verify_email", kwargs={"token": "bad-token-xyz"})
+        res = self.client.get(url)
+        self.assertEqual(res.status_code, 400)
+        self.assertContains(res, "لینک نامعتبر است", status_code=400)
+        self.user.refresh_from_db()
+        self.assertFalse(self.user.is_email_verified)
+
+    def test_resend_verification_view(self):
+        self.client.force_login(self.user)
+        url = reverse("accounts:resend_verification")
+
+        # GET request renders verify_sent page
+        res_get = self.client.get(url)
+        self.assertEqual(res_get.status_code, 200)
+        self.assertTemplateUsed(res_get, "accounts/verify_sent.html")
+
+        # POST request sends verification email
+        res_post = self.client.post(url)
+        self.assertEqual(res_post.status_code, 200)
+        self.assertEqual(len(mail.outbox), 1)
+        self.assertIn("verify-email", mail.outbox[0].body)
+        self.assertEqual(mail.outbox[0].to, [self.user.email])
+
+    def test_verified_required_blocks_unverified_user(self):
+        self.client.force_login(self.user)
+
+        res_item = self.client.get(reverse("catalog:item_create"), follow=True)
+        self.assertRedirects(res_item, reverse("accounts:profile"))
+        self.assertContains(res_item, "ابتدا باید آدرس ایمیل خود را تایید کنید")
+
+        self.user.is_email_verified = True
+        self.user.save()
+        res_item_verified = self.client.get(reverse("catalog:item_create"))
+        self.assertEqual(res_item_verified.status_code, 200)
+
 
 

@@ -8,6 +8,7 @@ from django.shortcuts import get_object_or_404, redirect, render
 from django.utils.translation import gettext_lazy as _
 
 from catalog.models import Item
+from core.decorators import verified_required
 from .forms import MessageForm
 from .models import Conversation, Message
 
@@ -57,11 +58,12 @@ def inbox(request):
     return render(request, "chat/inbox.html", context)
 
 
-@login_required
+@verified_required
 def start_conversation(request, item_pk):
     """
     Starts or opens an existing conversation between a renter and item owner.
     The item owner cannot start a conversation with themselves.
+    Requires verified email.
     """
     item = get_object_or_404(Item.objects.select_related("owner"), pk=item_pk)
 
@@ -116,6 +118,18 @@ def conversation_detail(request, pk):
     conversation.messages.exclude(sender=request.user).filter(is_read=False).update(is_read=True)
 
     if request.method == "POST":
+        if not request.user.is_email_verified and not request.user.is_staff:
+            logger.warning(
+                "Unverified user attempted to send message: user_id=%s conversation_id=%s",
+                request.user.pk,
+                conversation.pk,
+            )
+            messages.warning(
+                request,
+                "برای ارسال پیام در گفتگو، ابتدا باید آدرس ایمیل خود را تایید کنید.",
+            )
+            return redirect("accounts:profile")
+
         form = MessageForm(request.POST)
         if form.is_valid():
             msg = form.save(commit=False)

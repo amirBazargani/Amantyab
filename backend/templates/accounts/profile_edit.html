@@ -4,6 +4,26 @@
 
 {% block content %}
 <div class="max-w-3xl mx-auto my-8">
+    {% if not request.user.is_email_verified %}
+        <div class="mb-6 p-4 rounded-xl bg-amber-50 border border-amber-200 flex flex-col sm:flex-row items-center justify-between gap-3 text-amber-800">
+            <div class="flex items-center gap-3">
+                <svg class="w-6 h-6 text-amber-600 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path>
+                </svg>
+                <div class="text-sm">
+                    <span class="font-bold">ایمیل شما هنوز تایید نشده است.</span>
+                    برای ثبت کالا، درخواست اجاره و ارسال پیام نیاز به تایید ایمیل دارید.
+                </div>
+            </div>
+            <form method="post" action="{% url 'accounts:resend_verification' %}" class="flex-shrink-0">
+                {% csrf_token %}
+                <button type="submit" class="text-xs bg-amber-600 hover:bg-amber-700 text-white font-medium py-1.5 px-3 rounded-lg transition">
+                    ارسال مجدد لینک تایید
+                </button>
+            </form>
+        </div>
+    {% endif %}
+
     <!-- Header Card -->
     <div class="bg-white rounded-2xl shadow-sm border border-gray-200 p-6 mb-6">
         <div class="flex flex-col sm:flex-row items-center sm:items-start justify-between gap-4">
@@ -12,9 +32,23 @@
                     {{ request.user.first_name|first|default:request.user.username|first|upper }}
                 </div>
                 <div>
-                    <h1 class="text-xl font-bold text-gray-900">
-                        {{ request.user.get_full_name|default:request.user.username }}
-                    </h1>
+                    <div class="flex items-center gap-2">
+                        <h1 class="text-xl font-bold text-gray-900">
+                            {{ request.user.get_full_name|default:request.user.username }}
+                        </h1>
+                        {% if request.user.is_email_verified %}
+                            <span class="inline-flex items-center gap-1 text-xs text-emerald-700 bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded-full font-medium">
+                                <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
+                                </svg>
+                                ایمیل تایید شده
+                            </span>
+                        {% else %}
+                            <span class="inline-flex items-center gap-1 text-xs text-amber-700 bg-amber-50 border border-amber-200 px-2 py-0.5 rounded-full font-medium">
+                                ایمیل تایید نشده
+                            </span>
+                        {% endif %}
+                    </div>
                     <p class="text-sm text-gray-500 dir-ltr text-right">@{{ request.user.username }}</p>
                     <p class="text-xs text-gray-400 mt-1">عضویت از: {{ request.user.date_joined|date:"Y/m/d" }}</p>
                 </div>

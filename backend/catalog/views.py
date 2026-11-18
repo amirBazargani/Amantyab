@@ -11,6 +11,7 @@ from django.utils import timezone
 from django.views.decorators.http import require_POST
 
 from core.cookies import add_recent_item_id, set_last_city
+from core.decorators import verified_required
 from core.notifications import notify
 from reviews.models import Review
 
@@ -190,7 +191,7 @@ def my_items(request):
     return render(request, "catalog/my_items.html", context)
 
 
-@login_required
+@verified_required
 def item_create(request):
     """
     Register a new item with image uploads.

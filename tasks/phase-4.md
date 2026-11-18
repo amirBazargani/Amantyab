@@ -1,11 +1,12 @@
 # PHASE 4 — email verification, tests, template optimisation, report, gap closing
 (No bonus items. P4-05 is the stack requirement, do it only after P4-01..P4-04 and P4-06 are done.)
 
-- [ ] **P4-01 Email verification**
+- [x] **P4-01 Email verification**
   - Files: `accounts/tokens.py` (use `django.core.signing.TimestampSigner` or `default_token_generator`), views (verify_email, resend_verification), templates (`emails/verify.txt`, `verify_sent.html`), settings (EMAIL_BACKEND from env: console in dev, SMTP in prod), `accounts/models.py` (no change; uses is_email_verified).
   - Goal: after signup, a link valid for 24h; unverified users can log in and browse but cannot create items, request rentals, or send messages (decorator `verified_required`). The signup confirmation email from P2-02A gets the verification link added (ONE email, not two); the SMS stays a plain confirmation.
   - Acceptance: console shows the email; link verifies; expired/tampered link shows a friendly error; resend works; logs record verification events.
   - Commits: `feat(accounts): add email verification tokens and views` · `feat(core): restrict actions to verified users`
+  - Done notes: TimestampSigner with 24h expiration in accounts/tokens.py; verify_email and resend_verification views in accounts/views.py; templates in templates/accounts/verify_sent.html, templates/emails/verify.txt, templates/notifications/signup_confirmation_email_body.txt; verified_required decorator in core/decorators.py guarding item_create, rental_request, and chat; profile badges and resend button added; 191 automated tests passing.
 
 - [ ] **P4-02 Tests**
   - Files: `*/tests/` packages (`test_models.py`, `test_forms.py`, `test_views.py`, `test_services.py`), `core/tests/test_cookies.py`.
