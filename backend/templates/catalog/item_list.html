@@ -4,16 +4,26 @@
 
 {% block content %}
 <div class="max-w-7xl mx-auto my-6 space-y-6">
-    <!-- Header -->
-    <div class="flex flex-col md:flex-row md:items-center justify-between gap-4">
-        <div>
-            <h1 class="text-2xl md:text-3xl font-black text-gray-900">کاتالوگ امانت کالا</h1>
-            <p class="text-sm text-gray-500 mt-1">ابزار و وسایل مورد نیازتان را از همسایگان خود امانت بگیرید</p>
-        </div>
-        <div class="text-sm text-gray-600 bg-white px-4 py-2 rounded-xl border border-gray-200 shadow-sm self-start md:self-auto">
-            تعداد کل کالاها: <span class="font-bold text-blue-600">{{ total_count }}</span> مورد
-        </div>
-    </div>
+    <div id="item-search-island"
+         data-search-url="{% url 'catalog:item_search_json' %}"
+         data-initial-q="{{ q }}"
+         data-initial-category="{{ selected_category }}"
+         data-initial-city="{{ selected_city }}"
+         data-initial-max-price="{{ max_price }}"
+         data-categories="{{ categories_json|escape }}"
+         data-cities="{{ cities_json|escape }}">
+        <!-- Server-rendered fallback for progressive enhancement (works without JS) -->
+        <div class="space-y-6">
+            <!-- Header -->
+            <div class="flex flex-col md:flex-row md:items-center justify-between gap-4">
+                <div>
+                    <h1 class="text-2xl md:text-3xl font-black text-gray-900">کاتالوگ امانت کالا</h1>
+                    <p class="text-sm text-gray-500 mt-1">ابزار و وسایل مورد نیازتان را از همسایگان خود امانت بگیرید</p>
+                </div>
+                <div class="text-sm text-gray-600 bg-white px-4 py-2 rounded-xl border border-gray-200 shadow-sm self-start md:self-auto">
+                    تعداد کل کالاها: <span class="font-bold text-blue-600">{{ total_count }}</span> مورد
+                </div>
+            </div>
 
     <!-- Filter & Search Bar -->
     <div class="bg-white rounded-2xl shadow-sm border border-gray-200 p-5 md:p-6">
@@ -124,5 +134,7 @@
         {% url 'catalog:item_list' as all_items_url %}
         {% include "partials/empty_state.html" with icon="search" title="کالایی یافت نشد" message="متأسفانه هیچ کالایی با فیلترها و مشخصات مد نظر شما پیدا نشد. می‌توانید با حذف برخی فیلترها یا جستجوی عنوانی دیگر دوباره امتحان کنید." action_url=all_items_url action_text="مشاهده همه کالاها" %}
     {% endif %}
+        </div>
+    </div>
 </div>
 {% endblock %}

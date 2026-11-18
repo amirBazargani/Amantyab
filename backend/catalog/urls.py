@@ -6,6 +6,7 @@ app_name = "catalog"
 
 urlpatterns = [
     path("", views.item_list, name="item_list"),
+    path("search-json/", views.item_search_json, name="item_search_json"),
     path("my-items/", views.my_items, name="my_items"),
     path("new/", views.item_create, name="item_create"),
     path("<int:pk>/", views.item_detail, name="item_detail"),
