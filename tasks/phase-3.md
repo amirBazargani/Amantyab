@@ -21,11 +21,12 @@
   - Commit: `feat(accounts): add session settings and remember-me` · `feat(catalog): persist search filters in session`
   - Done notes: Configured DB-backed sessions with 2 weeks SESSION_COOKIE_AGE and SESSION_COOKIE_HTTPONLY; implemented remember_me checkbox on login (set_expiry(0) when unchecked); stored active search filters in request.session and prefilled catalog list page on subsequent visits; supported ?clear=1 to reset filters; ensured full session flush on logout; added clearsessions documentation in README; added 8 unit tests in accounts and catalog (144 total tests passing).
 
-- [ ] **P3-03 Cookie management**
+- [x] **P3-03 Cookie management**
   - Files: `core/cookies.py` (helpers), `catalog/views.py`, `templates/partials/recent_items.html`, home template.
   - Goal: signed cookie `recent_items` (last 6 viewed item ids, max_age 7 days, httponly) and cookie `last_city`; home page shows "recently viewed" and pre-selects city. Helpers use `set_signed_cookie/get_signed_cookie`.
   - Acceptance: cookies visible in browser devtools; tampered cookie is ignored without error.
   - Commit: `feat(core): add cookie helpers` · `feat(catalog): add recently viewed items and last city cookies`
+  - Done notes: Implemented signed cookie helpers in core/cookies.py with 7-day max_age, httponly, and URL-encoding for Persian city names; integrated cookie setting into catalog item_detail (signed recent_items list up to 6 unique items, last_city) and item_list (last_city filter); updated core/views.py home view to fetch active items preserving chronological order and pre-select city in search dropdown; added responsive recent_items.html partial; added 14 automated tests in core and catalog (157 total tests passing); verified tampered signatures are silently discarded without errors.
 
 - [ ] **P3-04 Logging configuration + middleware**
   - Files: `config/settings.py` (LOGGING dict: console + RotatingFileHandler `logs/app.log`, separate `logs/security.log`; loggers per app `amanatyab.<app>`), `core/middleware.py` (RequestLogMiddleware: method, path, user id, status, duration ms), `logs/.gitkeep`.
