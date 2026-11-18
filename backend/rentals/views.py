@@ -1,4 +1,6 @@
+import json
 import logging
+from datetime import datetime
 from decimal import Decimal
 
 from django.contrib import messages
@@ -6,7 +8,10 @@ from django.contrib.auth import get_user_model
 from django.contrib.auth.decorators import login_required
 from django.core.exceptions import PermissionDenied, ValidationError
 from django.db.models import Count, Q, Sum
+from django.http import JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
+from django.utils import timezone
+from django.utils.dateparse import parse_datetime
 from django.views.decorators.http import require_POST
 from django.utils.translation import gettext_lazy as _
 
@@ -623,5 +628,103 @@ def admin_dispute_resolve(request, pk):
         "payments": payments,
     }
     return render(request, "rentals/admin_dispute_resolve.html", context)
+
+
+def price_preview_json(request):
+    """
+    JSON endpoint for live booking price preview island (React).
+    Accepts item_id, start_at, and end_at.
+    Returns calculated rental amount, deposit, total, billed units, duration, and overlap check.
+    Supports both POST (JSON or form) and GET for flexibility.
+    """
+    if request.method == "POST":
+        if request.content_type == "application/json":
+            try:
+                data = json.loads(request.body.decode("utf-8"))
+            except (ValueError, UnicodeDecodeError):
+                data = {}
+        else:
+            data = request.POST
+    else:
+        data = request.GET
+
+    item_id = data.get("item_id")
+    start_str = (data.get("start_at") or "").strip()
+    end_str = (data.get("end_at") or "").strip()
+
+    if not item_id or not start_str or not end_str:
+        return JsonResponse({
+            "valid": False,
+            "error": "شناسه کالا، تاریخ تحویل و تاریخ بازگرداندن الزامی هستند.",
+        }, status=400)
+
+    try:
+        item = Item.objects.active().get(pk=item_id)
+    except (Item.DoesNotExist, ValueError):
+        return JsonResponse({
+            "valid": False,
+            "error": "کالای مورد نظر یافت نشد یا غیرفعال است.",
+        }, status=404)
+
+    start_at = parse_datetime(start_str)
+    if not start_at:
+        for fmt in ("%Y-%m-%dT%H:%M", "%Y-%m-%d %H:%M", "%Y-%m-%dT%H:%M:%S", "%Y-%m-%d %H:%M:%S"):
+            try:
+                start_at = datetime.strptime(start_str, fmt)
+                break
+            except ValueError:
+                pass
+
+    end_at = parse_datetime(end_str)
+    if not end_at:
+        for fmt in ("%Y-%m-%dT%H:%M", "%Y-%m-%d %H:%M", "%Y-%m-%dT%H:%M:%S", "%Y-%m-%d %H:%M:%S"):
+            try:
+                end_at = datetime.strptime(end_str, fmt)
+                break
+            except ValueError:
+                pass
+
+    if not start_at or not end_at:
+        return JsonResponse({
+            "valid": False,
+            "error": "فرمت تاریخ و ساعت ارسالی معتبر نیست.",
+        }, status=400)
+
+    if timezone.is_naive(start_at):
+        start_at = timezone.make_aware(start_at)
+    if timezone.is_naive(end_at):
+        end_at = timezone.make_aware(end_at)
+
+    if end_at <= start_at:
+        return JsonResponse({
+            "valid": False,
+            "error": "تاریخ و ساعت بازگرداندن باید پس از تاریخ و ساعت تحویل باشد.",
+        }, status=400)
+
+    try:
+        pricing = calculate_price(item, start_at, end_at)
+    except ValueError as e:
+        return JsonResponse({
+            "valid": False,
+            "error": str(e),
+        }, status=400)
+
+    overlap = has_overlap(item, start_at, end_at)
+
+    return JsonResponse({
+        "valid": True,
+        "pricing_type": pricing["pricing_type"],
+        "pricing_type_display": "ساعتی" if pricing["pricing_type"] == "hourly" else "روزانه",
+        "units_billed": pricing["units_billed"],
+        "unit_price": int(pricing["unit_price"]),
+        "rent_amount": int(pricing["rent_amount"]),
+        "deposit_amount": int(pricing["deposit_amount"]),
+        "commission_amount": int(pricing["commission_amount"]),
+        "total_amount": int(pricing["total_amount"]),
+        "duration_hours": round(pricing["hours_float"], 1),
+        "duration_days": round(pricing["days_float"], 1),
+        "has_overlap": overlap,
+    })
+
 
 

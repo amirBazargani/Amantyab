@@ -6,6 +6,7 @@ app_name = "rentals"
 
 urlpatterns = [
     path("request/<int:item_id>/", views.rental_request, name="rental_request"),
+    path("price-preview-json/", views.price_preview_json, name="price_preview_json"),
     path("my-rentals/", views.my_rentals, name="my_rentals"),
     path("owner-rentals/", views.owner_rentals, name="owner_rentals"),
     path("<int:pk>/pay/", views.rental_pay, name="rental_pay"),
