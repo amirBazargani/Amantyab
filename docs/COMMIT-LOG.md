@@ -579,3 +579,24 @@
 - مفهوم جنگو/پایتون که استفاده شد: ابزارهای مدیریت و پشتیبان‌گیری پایگاه داده PostgreSQL (`pg_dump`)، پشتیبان‌گیری ساختار (DDL) و داده‌های اولیه فاز ۳.
 - اگر استاد بپرسد: چگونه می‌توان این نسخه پشتیبان را در یک پایگاه داده خام لود کرد؟ پاسخ: با اجرای دستور `docker compose exec -T db psql -U amanatyab amanatyab < db_backup/phase-3.sql` یا معادل آن در محیط محلی، کل ساختار جداول، ایندکس‌ها، قیود و داده‌های شبیه‌سازی‌شده فاز ۳ در چند ثانیه بازیابی می‌شوند.
 
+---
+
+### 38fb5d9 — feat(accounts): add email verification tokens and views
+- تسک: P4-01
+- چه چیزی تغییر کرد: ماژول `accounts/tokens.py` با استفاده از `django.core.signing.TimestampSigner` و اعتبار ۲۴ ساعته جهت تولید و تایید توکن امضاشده پیاده‌سازی شد؛ ویوهای `verify_email` و `resend_verification` همراه با مسیرهای مربوطه اضافه شدند؛ قالب‌های `verify_sent.html`، `emails/verify.txt` و `signup_confirmation_email_body.txt` اضافه شدند؛ لینک تایید به ایمیل ثبت‌نام افزوده شد در حالی که پیامک ساده باقی ماند؛ وضعیت تایید و دکمه ارسال مجدد در پروفایل تعبیه شد؛ تنظیمات `EMAIL_BACKEND` و متغیرهای SMTP در `settings.py` و `.env.example` مستند گردید؛ و آزمون‌های اختصاصی در `accounts/tests.py` افزوده شدند.
+- چرا لازم بود: تایید ایمیل کاربران پس از ثبت‌نام طبق سرفصل فاز ۴ پروژه الزامی است تا از معتبر بودن آدرس ایمیل پیش از اعطای دسترسی‌های حساس اطمینان حاصل شود.
+- فایل‌های مهم: `backend/accounts/tokens.py`, `backend/accounts/views.py`, `backend/accounts/urls.py`, `backend/templates/accounts/verify_sent.html`, `backend/templates/emails/verify.txt`, `backend/templates/notifications/signup_confirmation_email_body.txt`, `backend/core/notifications.py`, `backend/templates/accounts/profile_detail.html`, `backend/templates/accounts/profile_edit.html`, `backend/config/settings.py`, `backend/.env.example`, `backend/accounts/tests.py`.
+- مفهوم جنگو/پایتون که استفاده شد: امضای دیجیتال دارای برچسب زمانی (`TimestampSigner`)، مدیریت تاریخ انقضا (`max_age`)، سیستم قالب‌های چندکاناله ایمیل/پیامک، و تست یکپارچگی ایمیل با `mail.outbox`.
+- اگر استاد بپرسد: چرا برای توکن تایید ایمیل از جدول دیتابیس جداگانه استفاده نشد و از `TimestampSigner` استفاده شد؟ پاسخ: کلاس `TimestampSigner` در جنگو بر اساس کلید امنیتی پروژه (`SECRET_KEY`) شناسه کاربر و زمان ایجاد را به شکل امن هش و امضا می‌کند (HMAC). این روش بدون نیاز به نوشتن در دیتابیس و مدیریت حذف رکوردهای منقضی، وضعیت انقضا و تغییرناپذیری توکن را با بالاترین بازدهی تضمین می‌نماید.
+
+---
+
+### 17a4c25 — feat(core): restrict actions to verified users
+- تسک: P4-01
+- چه چیزی تغییر کرد: دکوراتور `verified_required` در `core/decorators.py` پیاده‌سازی شد که کاربران لاگین‌نکرده را به لاگین و کاربران تاییدنشده را با نمایش پیام هشدار به پروفایل هدایت می‌کند (با معافیت ادمین‌ها)؛ این دکوراتور بر روی ویوی ثبت کالا (`item_create`)، ثبت درخواست اجاره (`rental_request`) و شروع گفتگو (`start_conversation`) و ارسال پیام در چت اعمال گردید؛ و فیچرهای تستی در `catalog/tests.py`، `rentals/tests.py` و `chat/tests.py` به‌روزرسانی شدند.
+- چرا لازم بود: طبق الزامات تسک P4-01، کاربران تاییدنشده می‌توانند لاگین کنند و در سایت و کالاها گردش نمایند، اما نباید بتوانند اقدام به ثبت کالای جدید، اجاره و ارسال پیام کنند.
+- فایل‌های مهم: `backend/core/decorators.py`, `backend/catalog/views.py`, `backend/rentals/views.py`, `backend/chat/views.py`, `backend/catalog/tests.py`, `backend/rentals/tests.py`, `backend/chat/tests.py`.
+- مفهوم جنگو/پایتون که استفاده شد: پایتون Decorators و `functools.wraps`، الگوهای کنترل دسترسی (Access Control Pattern)، و تفکیک دسترسی خواندنی و عملیاتی برای کاربران.
+- اگر استاد بپرسد: دکوراتور `verified_required` چگونه کار می‌کند و در صورت دسترسی غیرمجاز کاربر چه واکنشی نشان می‌دهد؟ پاسخ: دکوراتور ابتدا احراز هویت را با `request.user.is_authenticated` می‌سنجد و در صورت لزوم به لاگین می‌فرستد. سپس در صورتی که کاربر پرسنل (`is_staff`) نباشد و `is_email_verified` او `False` باشد، مانع از اجرای منطق ویو شده، پیام هشداری در فریم‌ورک Messages ثبت می‌کند و کاربر را به صفحه پروفایل (که دکمه ارسال مجدد لینک تایید در آن قرار دارد) ریدایرکت می‌نماید.
+
+
