@@ -1,11 +1,35 @@
 """Notification dispatch service handling dual-channel Email and SMS deliveries."""
 
+import logging
 from django.conf import settings
 from django.core.mail import send_mail
 from django.template.loader import render_to_string
 
 from .models import NotificationLog
 from .sms import get_sms_backend
+
+logger = logging.getLogger("amanatyab.core")
+
+
+def mask_phone(phone):
+    """Mask phone number showing only the last 3 digits (e.g. 09123456789 -> ********789)."""
+    if not phone:
+        return ""
+    clean = str(phone).strip()
+    if len(clean) <= 3:
+        return clean
+    return "*" * (len(clean) - 3) + clean[-3:]
+
+
+def mask_email(email):
+    """Mask email address showing only the domain (e.g. user@example.com -> @example.com)."""
+    if not email:
+        return ""
+    clean = str(email).strip()
+    if "@" in clean:
+        _, domain = clean.rsplit("@", 1)
+        return f"@{domain}"
+    return ""
 
 
 def notify(user, event, context=None, *, item=None, rental=None):
@@ -30,6 +54,7 @@ def notify(user, event, context=None, *, item=None, rental=None):
         body = f"Notification event: {event}"
 
     logs = []
+    user_id = user.pk if user else None
 
     # 2. Process Email Channel
     recipient_email = getattr(user, "email", None) if user else None
@@ -47,6 +72,12 @@ def notify(user, event, context=None, *, item=None, rental=None):
             rental=rental,
         )
         logs.append(email_log)
+        logger.info(
+            "Notification attempt: event=%s channel=email user_id=%s status=skipped recipient=%s",
+            event,
+            user_id,
+            mask_email(recipient_email),
+        )
     else:
         try:
             send_mail(
@@ -67,6 +98,12 @@ def notify(user, event, context=None, *, item=None, rental=None):
                 item=item,
                 rental=rental,
             )
+            logger.info(
+                "Notification attempt: event=%s channel=email user_id=%s status=sent recipient=%s",
+                event,
+                user_id,
+                mask_email(recipient_email),
+            )
         except Exception as exc:
             email_log = NotificationLog.objects.create(
                 user=user,
@@ -79,6 +116,13 @@ def notify(user, event, context=None, *, item=None, rental=None):
                 error=str(exc),
                 item=item,
                 rental=rental,
+            )
+            logger.warning(
+                "Notification attempt: event=%s channel=email user_id=%s status=failed recipient=%s error=%s",
+                event,
+                user_id,
+                mask_email(recipient_email),
+                exc,
             )
         logs.append(email_log)
 
@@ -98,6 +142,12 @@ def notify(user, event, context=None, *, item=None, rental=None):
             rental=rental,
         )
         logs.append(sms_log)
+        logger.info(
+            "Notification attempt: event=%s channel=sms user_id=%s status=skipped recipient=%s",
+            event,
+            user_id,
+            mask_phone(recipient_phone),
+        )
     else:
         try:
             sms_backend = get_sms_backend()
@@ -113,6 +163,12 @@ def notify(user, event, context=None, *, item=None, rental=None):
                 item=item,
                 rental=rental,
             )
+            logger.info(
+                "Notification attempt: event=%s channel=sms user_id=%s status=sent recipient=%s",
+                event,
+                user_id,
+                mask_phone(recipient_phone),
+            )
         except Exception as exc:
             sms_log = NotificationLog.objects.create(
                 user=user,
@@ -125,6 +181,13 @@ def notify(user, event, context=None, *, item=None, rental=None):
                 error=str(exc),
                 item=item,
                 rental=rental,
+            )
+            logger.warning(
+                "Notification attempt: event=%s channel=sms user_id=%s status=failed recipient=%s error=%s",
+                event,
+                user_id,
+                mask_phone(recipient_phone),
+                exc,
             )
         logs.append(sms_log)
 

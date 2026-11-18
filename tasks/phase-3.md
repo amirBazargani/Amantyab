@@ -28,11 +28,12 @@
   - Commit: `feat(core): add cookie helpers` · `feat(catalog): add recently viewed items and last city cookies`
   - Done notes: Implemented signed cookie helpers in core/cookies.py with 7-day max_age, httponly, and URL-encoding for Persian city names; integrated cookie setting into catalog item_detail (signed recent_items list up to 6 unique items, last_city) and item_list (last_city filter); updated core/views.py home view to fetch active items preserving chronological order and pre-select city in search dropdown; added responsive recent_items.html partial; added 14 automated tests in core and catalog (157 total tests passing); verified tampered signatures are silently discarded without errors.
 
-- [ ] **P3-04 Logging configuration + middleware**
+- [x] **P3-04 Logging configuration + middleware**
   - Files: `config/settings.py` (LOGGING dict: console + RotatingFileHandler `logs/app.log`, separate `logs/security.log`; loggers per app `amanatyab.<app>`), `core/middleware.py` (RequestLogMiddleware: method, path, user id, status, duration ms), `logs/.gitkeep`.
   - Goal: the notifications code logs every attempt to `amanatyab.core` (event, channel, user id, status); phone numbers are masked (last 3 digits), emails show only the domain; message bodies are never logged.
   - Acceptance: every request produces one line in app.log; logs/*.log git-ignored.
   - Commit: `feat(core): add logging config and request log middleware`
+  - Done notes: Configured comprehensive LOGGING dict in settings.py with console, RotatingFileHandler for logs/app.log and separate logs/security.log (5MB maxBytes, 5 backups), and per-app loggers (amanatyab.<app>); created logs/.gitkeep; implemented RequestLogMiddleware in core/middleware.py recording method, path, user id/anonymous, status code, and duration ms; added middleware to MIDDLEWARE settings; updated notifications service to log every dispatch attempt with masked phone numbers (last 3 digits visible) and masked emails (domain only), never logging message bodies; verified *.log files are git-ignored; added 8 automated tests in core/tests.py (165 total tests passing).
 
 - [ ] **P3-05 Add logging to every part of the project**
   - Goal: `logger = logging.getLogger("amanatyab.<app>")` in every views.py/services.py/forms where relevant. Log: login success/failure (security.log), signup, item create/edit/delete/toggle, rental request/payment/every transition/cancel, dispute open/resolve, review create, message send (no body), permission denied (warning), unexpected exceptions (`logger.exception`). Never log passwords, tokens, or message text.
