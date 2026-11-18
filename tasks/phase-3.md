@@ -41,10 +41,11 @@
   - Commits (one per app): `feat(accounts): add logging` · `feat(catalog): add logging` · `feat(rentals): add logging` · `feat(reviews): add logging` · `feat(chat): add logging`
   - Done notes: Added structured logging across all apps (`amanatyab.accounts`, `amanatyab.security`, `amanatyab.catalog`, `amanatyab.rentals`, `amanatyab.reviews`, `amanatyab.chat`); recorded login success/failure in `security.log` with IP and username without password; recorded signup, profile update, logout in accounts; item create, edit, toggle, delete, and permission warnings in catalog; rental creation, simulated payment, status transitions, cancel, dispute open/resolve in rentals with `logger.exception` on payment errors; review create and duplicate warnings in reviews; chat start and message dispatch (strictly without body) in chat; verified grep presence in all views; added 17 new tests across all apps (182 total tests passing).
 
-- [ ] **P3-06 Phase 3 wrap-up**
+- [x] **P3-06 Phase 3 wrap-up**
   - Files: `docs/REPORT.md` §4 and §6 (session, cookie, logging), `docs/DEFENSE.md`. `docs/REPORT.md` §6 also describes notifications (events, channels, NotificationLog, reminder command) and the map. Run `/phase-review`.
+  - Done notes: Completed sections 4 and 6 of docs/REPORT.md with comprehensive technical documentation of custom managers, session management, signed cookies, rotating logging architecture, multi-channel notifications, reminder command, and Leaflet map integration; added defense Q&As to docs/DEFENSE.md; dumped clean PostgreSQL database to db_backup/phase-3.sql; verified all 182 tests passing.
 
 ### Phase 3 deliverables checklist
 - [x] managers used by views; session + cookies demonstrable in the browser; logs generated for all apps
 - [x] `send_rental_reminders` works and is idempotent
-- [ ] `db_backup/phase-3.sql`; tag `phase-3-done`
+- [x] `db_backup/phase-3.sql`; tag `phase-3-done`
