@@ -162,6 +162,22 @@
                     💡 مبلغ نهایی اجاره و ودیعه در مرحله بعد به صورت دقیق محاسبه شده و قبل از پرداخت به شما نمایش داده می‌شود.
                 </div>
             </div>
+
+            <!-- Price Preview Island (React) -->
+            <div id="price-preview-island"
+                 data-item-id="{{ item.pk }}"
+                 data-preview-url="{% url 'rentals:price_preview_json' %}"
+                 data-daily-price="{{ item.daily_price }}"
+                 {% if item.hourly_price %}data-hourly-price="{{ item.hourly_price }}"{% endif %}
+                 data-deposit-amount="{{ item.deposit_amount }}">
+                <!-- Fallback when JavaScript is unavailable -->
+                <div class="bg-white rounded-2xl shadow-sm border border-gray-200 p-6 space-y-3">
+                    <h3 class="text-sm font-bold text-gray-900">محاسبه قیمت اجاره</h3>
+                    <p class="text-xs text-gray-500 leading-relaxed">
+                        مبلغ نهایی اجاره و ودیعه بر اساس تاریخ‌های انتخابی شما در گام بعد قبل از پرداخت نهایی محاسبه و نمایش داده می‌شود.
+                    </p>
+                </div>
+            </div>
         </div>
     </div>
 </div>

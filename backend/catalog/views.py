@@ -1,3 +1,4 @@
+import json
 import logging
 from decimal import Decimal, InvalidOperation
 
@@ -5,8 +6,9 @@ from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.core.exceptions import PermissionDenied
 from django.db.models import Avg, Q
-from django.http import Http404
+from django.http import Http404, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
+from django.urls import reverse
 from django.utils import timezone
 from django.views.decorators.http import require_POST
 
@@ -77,10 +79,18 @@ def item_list(request):
         .order_by("city")
     )
 
+    categories_json = json.dumps([
+        {"id": c.pk, "name": c.name, "slug": c.slug}
+        for c in categories
+    ])
+    cities_json = json.dumps(list(cities))
+
     context = {
         "items": items,
         "categories": categories,
         "cities": cities,
+        "categories_json": categories_json,
+        "cities_json": cities_json,
         "q": q,
         "selected_category": category_param,
         "selected_city": city,
@@ -377,3 +387,55 @@ def item_delete(request, pk):
         "item": item,
     }
     return render(request, "catalog/item_confirm_delete.html", context)
+
+
+def item_search_json(request):
+    """
+    JSON endpoint for live search island (React).
+    Filters active items by q, category, city, and max_price.
+    Returns JSON list of items with details, image URLs, and pricing.
+    """
+    q = request.GET.get("q", "").strip()
+    category_param = request.GET.get("category", "").strip()
+    city = request.GET.get("city", "").strip()
+    max_price_param = request.GET.get("max_price", "").strip()
+
+    queryset = (
+        Item.objects.active()
+        .search(q)
+        .in_category(category_param)
+        .in_city(city)
+        .price_up_to(max_price_param)
+        .select_related("category", "owner")
+        .prefetch_related("images")
+    )
+
+    items_data = []
+    for item in queryset:
+        primary_image = item.primary_image
+        image_url = (
+            primary_image.image.url
+            if primary_image and primary_image.image
+            else None
+        )
+        items_data.append({
+            "id": item.id,
+            "title": item.title,
+            "category": item.category.name,
+            "category_slug": item.category.slug,
+            "city": item.city,
+            "neighborhood": item.neighborhood or "",
+            "daily_price": int(item.daily_price),
+            "hourly_price": int(item.hourly_price) if item.hourly_price else None,
+            "deposit_amount": int(item.deposit_amount),
+            "image_url": image_url,
+            "detail_url": reverse("catalog:item_detail", args=[item.pk]),
+            "allow_pickup": item.allow_pickup,
+            "allow_courier": item.allow_courier,
+        })
+
+    return JsonResponse({
+        "items": items_data,
+        "total_count": len(items_data),
+    })
+

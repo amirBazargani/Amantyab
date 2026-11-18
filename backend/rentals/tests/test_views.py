@@ -1,3 +1,4 @@
+import json
 from datetime import timedelta
 from decimal import Decimal
 from io import StringIO
@@ -188,6 +189,106 @@ class RentalViewsTestCase(TestCase):
             resp = self.client.get(reverse("rentals:my_rentals"))
             self.assertEqual(resp.status_code, 200)
             self.assertGreaterEqual(len(resp.context["rentals"]), 8)
+
+    def test_price_preview_json_hourly(self):
+        url = reverse("rentals:price_preview_json")
+        now = timezone.now().replace(microsecond=0)
+        start_at = (now + timedelta(days=2)).isoformat()
+        end_at = (now + timedelta(days=2, hours=5)).isoformat()
+
+        resp = self.client.post(
+            url,
+            data=json.dumps({
+                "item_id": self.item.pk,
+                "start_at": start_at,
+                "end_at": end_at,
+            }),
+            content_type="application/json",
+        )
+        self.assertEqual(resp.status_code, 200)
+        data = resp.json()
+        self.assertTrue(data["valid"])
+        self.assertEqual(data["pricing_type"], "hourly")
+        self.assertEqual(data["units_billed"], 5)
+        self.assertEqual(data["unit_price"], 30000)
+        self.assertEqual(data["rent_amount"], 150000)
+        self.assertEqual(data["deposit_amount"], 500000)
+        self.assertEqual(data["total_amount"], 650000)
+        self.assertFalse(data["has_overlap"])
+
+    def test_price_preview_json_daily(self):
+        url = reverse("rentals:price_preview_json")
+        now = timezone.now().replace(microsecond=0)
+        start_at = (now + timedelta(days=2)).strftime("%Y-%m-%dT%H:%M")
+        end_at = (now + timedelta(days=5)).strftime("%Y-%m-%dT%H:%M")
+
+        resp = self.client.post(
+            url,
+            data={
+                "item_id": self.item.pk,
+                "start_at": start_at,
+                "end_at": end_at,
+            },
+        )
+        self.assertEqual(resp.status_code, 200)
+        data = resp.json()
+        self.assertTrue(data["valid"])
+        self.assertEqual(data["pricing_type"], "daily")
+        self.assertEqual(data["units_billed"], 3)
+        self.assertEqual(data["unit_price"], 150000)
+        self.assertEqual(data["rent_amount"], 450000)
+        self.assertEqual(data["total_amount"], 950000)
+
+    def test_price_preview_json_overlap_detected(self):
+        url = reverse("rentals:price_preview_json")
+        now = timezone.now().replace(microsecond=0)
+        # Create an existing blocking rental
+        Rental.objects.create(
+            renter=self.renter,
+            item=self.item,
+            start_at=now + timedelta(days=3),
+            end_at=now + timedelta(days=6),
+            rent_amount=Decimal("450000"),
+            deposit_amount=Decimal("500000"),
+            status=Rental.Status.CONFIRMED,
+        )
+
+        resp = self.client.post(
+            url,
+            data={
+                "item_id": self.item.pk,
+                "start_at": (now + timedelta(days=4)).isoformat(),
+                "end_at": (now + timedelta(days=5)).isoformat(),
+            },
+        )
+        self.assertEqual(resp.status_code, 200)
+        data = resp.json()
+        self.assertTrue(data["valid"])
+        self.assertTrue(data["has_overlap"])
+
+    def test_price_preview_json_invalid_dates(self):
+        url = reverse("rentals:price_preview_json")
+        now = timezone.now()
+        resp = self.client.post(
+            url,
+            data={
+                "item_id": self.item.pk,
+                "start_at": (now + timedelta(days=3)).isoformat(),
+                "end_at": (now + timedelta(days=2)).isoformat(),
+            },
+        )
+        self.assertEqual(resp.status_code, 400)
+        data = resp.json()
+        self.assertFalse(data["valid"])
+        self.assertIn("error", data)
+
+    def test_price_preview_json_missing_fields(self):
+        url = reverse("rentals:price_preview_json")
+        resp = self.client.post(url, data={"item_id": self.item.pk})
+        self.assertEqual(resp.status_code, 400)
+        data = resp.json()
+        self.assertFalse(data["valid"])
+
 
 
 

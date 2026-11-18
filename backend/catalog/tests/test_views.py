@@ -293,6 +293,53 @@ class CatalogViewsTestCase(TestCase):
         staff_res = self.client.get(reverse("catalog:item_detail", args=[self.inactive_item.pk]))
         self.assertEqual(staff_res.status_code, 200)
 
+    def test_item_search_json_returns_active_items(self):
+        url = reverse("catalog:item_search_json")
+        resp = self.client.get(url)
+        self.assertEqual(resp.status_code, 200)
+        data = resp.json()
+        self.assertIn("items", data)
+        self.assertIn("total_count", data)
+        self.assertGreaterEqual(data["total_count"], 3)
+        item_titles = [i["title"] for i in data["items"]]
+        self.assertIn(self.item_drill.title, item_titles)
+        self.assertIn(self.item_tent.title, item_titles)
+
+    def test_item_search_json_filter_by_query(self):
+        url = reverse("catalog:item_search_json")
+        resp = self.client.get(url, {"q": "دریل"})
+        self.assertEqual(resp.status_code, 200)
+        data = resp.json()
+        self.assertEqual(data["total_count"], 1)
+        self.assertEqual(data["items"][0]["title"], self.item_drill.title)
+
+    def test_item_search_json_filter_by_category(self):
+        url = reverse("catalog:item_search_json")
+        resp = self.client.get(url, {"category": "camping"})
+        self.assertEqual(resp.status_code, 200)
+        data = resp.json()
+        self.assertEqual(data["total_count"], 1)
+        self.assertEqual(data["items"][0]["title"], self.item_tent.title)
+
+    def test_item_search_json_filter_by_city(self):
+        url = reverse("catalog:item_search_json")
+        resp = self.client.get(url, {"city": "اصفهان"})
+        self.assertEqual(resp.status_code, 200)
+        data = resp.json()
+        self.assertEqual(data["total_count"], 1)
+        self.assertEqual(data["items"][0]["title"], self.item_saw.title)
+
+    def test_item_search_json_filter_by_max_price(self):
+        url = reverse("catalog:item_search_json")
+        resp = self.client.get(url, {"max_price": "60000"})
+        self.assertEqual(resp.status_code, 200)
+        data = resp.json()
+        self.assertTrue(all(i["daily_price"] <= 60000 for i in data["items"]))
+        item_titles = [i["title"] for i in data["items"]]
+        self.assertIn(self.item_drill.title, item_titles)
+        self.assertNotIn(self.item_tent.title, item_titles)
+        self.assertNotIn(self.item_saw.title, item_titles)
+
 
 
 
@@ -1044,6 +1091,7 @@ class CatalogLoggingTests(TestCase):
             any("Permission denied on item edit" in msg for msg in cm.output),
             f"Expected permission warning in {cm.output}",
         )
+
 
 
 

@@ -27,11 +27,12 @@
   - Commit: `docs: complete final project report`
   - Done notes: Completed docs/REPORT.md matching all Phase 4 features: 5 Mermaid process diagrams (whole flow, rental state machine, search-to-rent, dispute resolution, email verification); full app processes; 11 model specifications and ER diagram with geo fields (latitude, longitude, address_text), reminder_sent_at, delivery_address, and core.NotificationLog; managers and reasons table with chainability; complete 32 views table from urls.py including verify_email and resend_verification; comprehensive extras covering notifications (events, channels, backends, resilience), interactive map (Leaflet/OSM, privacy circle), email verification (TimestampSigner, 24h, verified_required), template optimization, sessions, cookies, logging, 227 tests summary, and PDF export guide; 227 tests passing.
 
-- [ ] **P4-05 React islands + Tailwind build (stack requirement)**
+- [x] **P4-05 React islands + Tailwind build (stack requirement)**
   - Files: `frontend/` (Vite + React + Tailwind), `backend/templates/base.html` (load built assets via a small `{% vite_asset %}`-free approach: fixed filenames from `vite build` into `backend/static/dist/`), `catalog/views.py` (+ `item_search_json`), `rentals/views.py` (+ `price_preview_json`).
   - Goal: replace Tailwind CDN with the built CSS. Island 1: live item search/filter list (fetch to `item_search_json`). Island 2: booking price preview on the rental request page (fetch to `price_preview_json`, same calculate_price service). Islands mount on `<div id="..." data-*>` elements; pages still work without JS (normal form/GET fallback).
   - Acceptance: `npm run build` OK; both islands work; CSRF cookie header used on POST fetches; tests for both JSON endpoints.
   - Commits: `chore(frontend): scaffold Vite React Tailwind` · `feat(catalog): add live search island and JSON endpoint` · `feat(rentals): add price preview island and endpoint` · `chore: switch base template to built Tailwind assets`
+  - Done notes: Scaffolded frontend/ with Vite 6, React 18, and Tailwind CSS compiling to backend/static/dist/bundle.js and bundle.css; removed Tailwind CDN from base.html; implemented item_search_json view in catalog/views.py and ItemSearchIsland React component with live debounced search and server-rendered fallback; implemented price_preview_json view in rentals/views.py and PricePreviewIsland React component syncing with datetime inputs and sending X-CSRFToken headers on POST; verified full test suite with 237 passing tests.
 
 - [ ] **P4-06 Gap-closing pass over phases 1–3**
   - Goal: run the checklist of each earlier phase again; fix what is missing or drifted; fresh-database run (`drop db → migrate → seed_demo → runserver`) must work; update docs.
