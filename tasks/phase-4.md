@@ -8,11 +8,12 @@
   - Commits: `feat(accounts): add email verification tokens and views` · `feat(core): restrict actions to verified users`
   - Done notes: TimestampSigner with 24h expiration in accounts/tokens.py; verify_email and resend_verification views in accounts/views.py; templates in templates/accounts/verify_sent.html, templates/emails/verify.txt, templates/notifications/signup_confirmation_email_body.txt; verified_required decorator in core/decorators.py guarding item_create, rental_request, and chat; profile badges and resend button added; 191 automated tests passing.
 
-- [ ] **P4-02 Tests**
+- [x] **P4-02 Tests**
   - Files: `*/tests/` packages (`test_models.py`, `test_forms.py`, `test_views.py`, `test_services.py`), `core/tests/test_cookies.py`.
   - Must cover: model constraints; pricing (hour/day); overlap detection; every legal and illegal rental transition; queryset methods; permission checks (403/redirect); review rules; dispute resolution; email verification; session remember-me; cookie tamper; notifications (locmem mail outbox + `sms.outbox`: sent, skipped without phone, failed backend does not break the request), phone validation, the reminder command (window, status filter, idempotency), geo validation (both-or-none, ranges, courier requires address).
   - Acceptance: `python manage.py test` green; at least ~40 tests; a short "how to run tests" in README.
   - Commits (one per app): `test(accounts): ...`, `test(catalog): ...`, `test(rentals): ...`, `test(reviews): ...`, `test(chat): ...`, `test(core): ...`
+  - Done notes: Monolithic tests.py files modularized into tests/ packages (test_models.py, test_forms.py, test_services.py, test_views.py) across accounts, catalog, rentals, reviews, chat, and core; core/tests/test_cookies.py created with signed cookie tamper resilience tests; notifications tested with locmem outbox and sms.outbox, skipped without phone, resilient against backend failures; reminder command window, status filter, and idempotency verified; geo validation both-or-none, ranges, and courier address requirement verified; 221 automated tests passing 100% green; README updated with running tests guide.
 
 - [ ] **P4-03 Template optimisation**
   - Goal: remove duplicated markup (partials: item_card, rental_row, form_field, pagination-free list), `{% include %}` with parameters, custom template tags only where they remove repetition; fix N+1 queries with `select_related/prefetch_related` in the QuerySets; add `assertNumQueries` tests for item_list, my_rentals, admin_dashboard; remove inline logic from templates; compress/resize uploaded images on save (Pillow, max 1200px).
