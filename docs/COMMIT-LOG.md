@@ -711,3 +711,44 @@
 - فایل‌های مهم: `docs/REPORT.md`.
 - مفهوم جنگو/پایتون که استفاده شد: مستندسازی معماری سیستم، استخراج روت‌ها از URLconf جنگو، مستندسازی مدل‌های داده‌ای رابطه‌ای، نمودارهای استاندارد Mermaid، تشریح سازوکار توکن‌های زمانی `TimestampSigner` و بهینه‌سازی کوئری‌ها (`select_related`/`prefetch_related`).
 - اگر استاد بپرسد: چه بخش‌هایی در این بازبینی گزارش اضافه و اصلاح شد؟ پاسخ: جداول مدل‌ها برای انطباق ۱۰۰٪ با کد دیتابیس شامل فیلدهای نقشه (`latitude`, `longitude`, `address_text` در کالا و `delivery_address` در اجاره) و مدل `NotificationLog` اصلاح شدند. جدول ویوها با ویوهای جدید فاز ۴ (`verify_email` و `resend_verification`) همگام شد، فرآیند فعال‌سازی ایمیلی در قالب نمودار و متن فرآیند تشریح گردید و بخش تفصیلی اعلان‌ها، نقشه و آمار ۲۲۷ تست سبز به عنوان ویژگی‌های کلیدی اضافه شد.
+
+---
+
+### 7c733b2 — chore(frontend): scaffold Vite React Tailwind
+- تسک: P4-05
+- چه چیزی تغییر کرد: راه‌اندازی زیرساخت فرانت‌اند در پوشه `frontend/` با ابزار Vite، React 18، Tailwind CSS و Autoprefixer؛ پیکربندی مسیر خروجی بیلد به `backend/static/dist/` با نام‌های ثابت `bundle.js` و `bundle.css`؛ ایجاد ماژول استخراج امن توکن CSRF (`csrf.js`).
+- چرا لازم بود: تحقق نیازمندی استک پروژه (React islands + Tailwind build) و حذف وابستگی به CDN خارجی تیل‌ویند.
+- فایل‌های مهم: `frontend/package.json`, `frontend/vite.config.js`, `frontend/tailwind.config.js`, `frontend/src/style.css`, `frontend/src/utils/csrf.js`.
+- مفهوم فرانت‌اند/جنگو که استفاده شد: تنظیم Vite Build برای تولید Asset با نام ثابت جهت لود بدون نیاز به پلاگین‌های پیچیده در جنگو، اسکن الگوهای قالب جنگو در Tailwind `content`، و استخراج توکن CSRF از کوکی مرورگر.
+- اگر استاد بپرسد: چرا فایل‌های خروجی را با نام ثابت بیلد کردی؟ پاسخ: جنگو به صورت پیش‌فرض هش‌های فایل‌های بیلد شده (مانند `bundle.d8a9f.js`) را بدون پکیج‌های ثالث مثل `django-vite` نمی‌شناسد؛ با تنظیم `rollupOptions.output` در Vite، نام فایل‌ها ثابت شده و با تگ استاندارد `{% static 'dist/bundle.js' %}` مستقیماً و به سادگی لود می‌شوند.
+
+---
+
+### fbc9a3f — feat(catalog): add live search island and JSON endpoint
+- تسک: P4-05
+- چه چیزی تغییر کرد: پیاده‌سازی اندپوینت `item_search_json` در `catalog/views.py` و ثبت مسیر `search-json/` در `catalog/urls.py`؛ ساخت کامپوننت جزیره‌ای `ItemSearchIsland.jsx` برای جستجو و فیلتر زنده کالاها به همراه debounce؛ اتصال داده‌های اولیه و نگهداری fallback کامل سروری در `item_list.html`؛ افزودن تست‌های خودکار اندپوینت در `catalog/tests/test_views.py`.
+- چرا لازم بود: فراهم‌سازی تجربه کاربری روان و آنی (React Island) در کاتالوگ کالاها با حفظ Progressive Enhancement برای محیط‌های فاقد جاوااسکریپت.
+- فایل‌های مهم: `backend/catalog/views.py`, `backend/catalog/urls.py`, `backend/catalog/tests/test_views.py`, `backend/templates/catalog/item_list.html`, `frontend/src/islands/ItemSearchIsland.jsx`.
+- مفهوم فرانت‌اند/جنگو که استفاده شد: `JsonResponse` در جنگو، استفاده از کوئری‌ست‌های سفارشی زنجیره‌ای (`search`, `in_category`, `in_city`, `price_up_to`)، React Hooks (`useState`, `useEffect`, `useRef`) و الگوی React Island با خواندن خصوصیات `data-*`.
+- اگر استاد بپرسد: اگر جاوااسکریپت کاربر غیرفعال باشد کاتالوگ چگونه کار می‌کند؟ پاسخ: المنتی که React روی آن سوار (mount) می‌شود در ابتدا محتوای کامل HTML رندر شده توسط سرور (فرم جستجو و کارت‌های کالا) را در خود دارد؛ بنابراین در صورت نبود جاوااسکریپت، کاربر بدون هیچ مشکلی با متد GET استاندارد فرم را ارسال کرده و صفحه بازخوانی می‌شود.
+
+---
+
+### 36679dc — feat(rentals): add price preview island and endpoint
+- تسک: P4-05
+- چه چیزی تغییر کرد: پیاده‌سازی اندپوینت `price_preview_json` در `rentals/views.py` و ثبت مسیر `price-preview-json/` در `rentals/urls.py` با پشتیبانی از درخواست‌های POST (جیسون و فرم)؛ ایجاد کامپوننت `PricePreviewIsland.jsx` که تغییرات ورودی‌های تاریخ فرم را شنود کرده و جزئیات قیمت (اجاره، تعرفه ساعتی/روزانه، ودیعه و هشدار تداخل) را زنده محاسبه و نمایش می‌دهد؛ افزودن آزمون‌های خودکار در `rentals/tests/test_views.py`.
+- چرا لازم بود: ارائه پیش‌نمایش آنی و شفاف از هزینه‌ها به کاربر پیش از ارسال فرم نهایی درخواست اجاره و پیشگیری از ارسال رزروهای دارای تداخل زمانی.
+- فایل‌های مهم: `backend/rentals/views.py`, `backend/rentals/urls.py`, `backend/rentals/tests/test_views.py`, `backend/templates/rentals/rental_request.html`, `frontend/src/islands/PricePreviewIsland.jsx`.
+- مفهوم فرانت‌اند/جنگو که استفاده شد: بازاستفاده از توابع سرویس تجاری دامنه‌ای (`calculate_price`, `has_overlap`)، ارسال درخواست‌های امن Fetch با هدر `X-CSRFToken`، تجزیه داده‌های ارسالی با `json.loads` و اعتبارسنجی تاریخ‌ها با `django.utils.dateparse`.
+- اگر استاد بپرسد: چرا در درخواست POST پیش‌نمایش قیمت، هدر CSRF ارسال شده است؟ پاسخ: جنگو به صورت پیش‌فرض تمام درخواست‌های POST را در برابر حملات جعل درخواست میان‌سایتی (CSRF) بررسی می‌کند؛ کامپوننت ری‌اکت توکن معتبر سشن کاربر را از کوکی خوانده و در هدر `X-CSRFToken` ارسال می‌کند تا درخواست توسط میدل‌ویر امنیتی جنگو رد نشود.
+
+---
+
+### ccbd811 — chore: switch base template to built Tailwind assets
+- تسک: P4-05
+- چه چیزی تغییر کرد: جایگزینی اسکریپت CDN تیل‌ویند در `backend/templates/base.html` با استایل کامپایل‌شده محلی `dist/bundle.css` و اسکریپت `dist/bundle.js`؛ پیاده‌سازی نقطه ورود اصلی فرانت‌اند در `frontend/src/main.jsx` جهت سوار کردن خودکار جزایر ری‌اکت روی شناسه المان‌های مربوطه؛ بیلد و ثبت خروجی نهایی دارایی‌های استاتیک در مخزن.
+- چرا لازم بود: قطع کامل وابستگی پروژه به CDN خارجی و یکپارچه‌سازی فرانت‌اند بیلد شده با لایه استاتیک جنگو.
+- فایل‌های مهم: `backend/templates/base.html`, `frontend/src/main.jsx`, `backend/static/dist/bundle.css`, `backend/static/dist/bundle.js`.
+- مفهوم فرانت‌اند/جنگو که استفاده شد: تگ استاندارد `{% static %}` در قالب‌های جنگو، ویژگی `defer` در بارگذاری اسکریپت و الگوی Islands Architecture در وب مدرن.
+- اگر استاد بپرسد: تفاوت معماری Islands با یک Single Page Application (SPA) کامل چیست؟ پاسخ: در معماری جزیره‌ای، صفحات همچنان توسط قالب‌های جنگو رندر سروری (SSR) می‌شوند و از سشن، فرم‌ها و مسیریابی استاندارد جنگو استفاده می‌کنیم؛ ری‌اکت صرفاً در بخش‌هایی از صفحه که نیازمند تعامل و پویایی بالا هستند (مانند سرچ زنده و محاسبه آنی قیمت) فعال می‌شود که سرعت بارگذاری را بسیار بالاتر برده و پیچیدگی‌های SPA و CORS را از بین می‌برد.
+
