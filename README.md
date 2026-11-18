@@ -69,3 +69,30 @@ python manage.py clearsessions
   schtasks /create /tn "AmanatyabClearSessions" /tr "C:\path\to\project\.venv\Scripts\python.exe C:\path\to\project\backend\manage.py clearsessions" /sc daily /st 03:00
   ```
 
+## Running Automated Tests (اجرای تست‌های خودکار)
+
+The test suite covers models, constraints, pricing, state machine transitions, form validation, permission checks, dispute handling, cookies, notifications, and scheduled commands across all applications (220+ tests).
+
+```bash
+# Activate your virtual environment and navigate to the backend directory:
+cd backend
+
+# Run the complete test suite:
+python manage.py test
+
+# Run tests with increased verbosity:
+python manage.py test -v 2
+
+# Run tests for a specific application:
+python manage.py test accounts
+python manage.py test catalog
+python manage.py test rentals
+python manage.py test reviews
+python manage.py test chat
+python manage.py test core
+
+# Run a specific test module or test case:
+python manage.py test rentals.tests.test_services
+python manage.py test core.tests.test_cookies
+```
+

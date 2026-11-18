@@ -600,3 +600,73 @@
 - اگر استاد بپرسد: دکوراتور `verified_required` چگونه کار می‌کند و در صورت دسترسی غیرمجاز کاربر چه واکنشی نشان می‌دهد؟ پاسخ: دکوراتور ابتدا احراز هویت را با `request.user.is_authenticated` می‌سنجد و در صورت لزوم به لاگین می‌فرستد. سپس در صورتی که کاربر پرسنل (`is_staff`) نباشد و `is_email_verified` او `False` باشد، مانع از اجرای منطق ویو شده، پیام هشداری در فریم‌ورک Messages ثبت می‌کند و کاربر را به صفحه پروفایل (که دکمه ارسال مجدد لینک تایید در آن قرار دارد) ریدایرکت می‌نماید.
 
 
+
+---
+
+### 613165f — test(accounts): modularize tests and cover tokens, remember-me, phone validation
+- تسک: P4-02
+- چه چیزی تغییر کرد: فایل یکپارچه `accounts/tests.py` به پکیج ماژولار `accounts/tests/` شامل `test_models.py`، `test_forms.py`، `test_views.py` و `test_services.py` تفکیک گردید و آزمون‌های اعتبارسنجی ارقام فارسی شماره موبایل، پیش‌شماره‌های مجاز و نامعتبر، انقضا و دستکاری توکن‌های تایید ایمیل و انقضای نشست در حالت Remember-me توسعه داده شد.
+- چرا لازم بود: طبق الزامات تسک P4-02، آزمون‌های هر اپلیکیشن باید به شکل پکیج استاندارد سازماندهی شوند و تمام قیود مدل، اعتبارسنجی فرم‌ها و امنیت نشست پوشش داده شوند.
+- فایل‌های مهم: `backend/accounts/tests/__init__.py`, `backend/accounts/tests/test_models.py`, `backend/accounts/tests/test_forms.py`, `backend/accounts/tests/test_services.py`, `backend/accounts/tests/test_views.py`.
+- مفهوم جنگو/پایتون که استفاده شد: ساختار ماژولار پکیج‌های آزمون جنگو (`unittest.TestCase`)، اعتبارسنجی فرم‌ها و متد `clean_phone`، و تست رفتار نشست (`session.get_expire_at_browser_close()`).
+- اگر استاد بپرسد: چرا تست‌ها از یک فایل به ساختار پکیج `tests/` منتقل شدند؟ پاسخ: با افزایش تعداد آزمون‌ها، نگهداری فایل‌های چندهزار خطی دشوار است. تفکیک به فایل‌های مدل، فرم، سرویس و ویو ساختار استاندارد جنگو را پیاده‌سازی کرده و کشف آزمون‌ها توسط Test Runner جنگو را سریع و شفاف می‌کند.
+
+---
+
+### 6a61b77 — test(catalog): modularize tests and cover geo coordinates, forms, querysets
+- تسک: P4-02
+- چه چیزی تغییر کرد: تفکیک آزمون‌های کاتالوگ به پکیج `catalog/tests/` با فایل‌های `test_models.py`، `test_forms.py`، `test_services.py` و `test_views.py`؛ پوشش کامل اعتبارسنجی دیتابیس و فرم برای ورود هر دو مختصات جغرافیایی یا هیچ‌کدام، بازه‌های مجاز عرض و طول جغرافیایی، لزوم انتخاب حداقل یک روش تحویل (حضوری یا پیک) و متدهای کوئری‌ست جستجو.
+- چرا لازم بود: تضمین صحت و عدم شکست اعتبارسنجی ژئومکان و کوئری‌ست‌های کاتالوگ در تمام سناریوهای کاربری طبق مستندات دامنه.
+- فایل‌های مهم: `backend/catalog/tests/__init__.py`, `backend/catalog/tests/test_models.py`, `backend/catalog/tests/test_forms.py`, `backend/catalog/tests/test_services.py`, `backend/catalog/tests/test_views.py`.
+- مفهوم جنگو/پایتون که استفاده شد: تست قیود جامعیت دیتابیس (`IntegrityError` و `CheckConstraint`)، تست فیلترهای سلسله‌مراتبی دسته‌بندی و زنجیره متدهای `QuerySet`.
+- اگر استاد بپرسد: قید دیتابیسی مختصات جغرافیایی چگونه تست شده است؟ پاسخ: با تلاش برای ایجاد رکوردی که فقط دارای عرض جغرافیایی است بدون طول جغرافیایی، و بررسی اینکه دیتابیس مستقیماً خطای `IntegrityError` صادر می‌کند؛ همچنین تست متد `full_clean()` برای بازه‌های عددی مجاز (-90 تا 90 و -180 تا 180).
+
+---
+
+### 0029ff0 — test(rentals): modularize tests and cover state transitions, reminder idempotency
+- تسک: P4-02
+- چه چیزی تغییر کرد: بازسازی و سازماندهی آزمون‌های اپلیکیشن اجاره در پکیج `rentals/tests/` شامل `test_models.py`، `test_forms.py`، `test_services.py`، `test_views.py` و `test_commands.py`؛ پوشش کامل تمامی تغییر وضعیت‌های مجاز و غیرمجاز ماشین وضعیت، فرمول قیمت‌گذاری روزانه/ساعتی، حل اختلاف، و تست ویژگی Idempotency و پنجره زمانی در دستور یادآوری `send_rental_reminders`.
+- چرا لازم بود: هسته تراکنشی و مالی سامانه امانت‌یاب نیازمند آزمون‌های جامع جهت جلوگیری از خطاهای انتقال وضعیت غیرمجاز، تداخل رزروها و ارسال پیامک‌های تکراری است.
+- فایل‌های مهم: `backend/rentals/tests/__init__.py`, `backend/rentals/tests/test_models.py`, `backend/rentals/tests/test_forms.py`, `backend/rentals/tests/test_services.py`, `backend/rentals/tests/test_views.py`, `backend/rentals/tests/test_commands.py`.
+- مفهوم جنگو/پایتون که استفاده شد: تست ماشین وضعیت (`can_transition`)، تست دستورات مدیریتی با `call_command` و موک‌کردن زمان با `django.utils.timezone`.
+- اگر استاد بپرسد: خاصیت Idempotency در دستور یادآوری چگونه تست شده است؟ پاسخ: با اجرای دستور `call_command('send_rental_reminders')` برای بار اول و ارسال نوتیفیکیشن، و سپس اجرای بلافاصله آن برای بار دوم در همان پنجره زمانی و اثبات اینکه هیچ پیامک یا ایمیل تکراری ارسال نمی‌شود (`reminded_at` ذخیره شده است).
+
+---
+
+### d2820cd — test(reviews): modularize tests and cover rating constraints and permissions
+- تسک: P4-02
+- چه چیزی تغییر کرد: تفکیک آزمون‌های نظرات در پکیج `reviews/tests/` با فایل‌های `test_models.py`، `test_forms.py`، `test_services.py` و `test_views.py`؛ پوشش بازه مجاز امتیاز (۱ تا ۵)، منع ثبت نظر تکراری توسط یک کاربر روی یک اجاره، منع ثبت نظر روی اجاره‌های در جریان یا لغو شده، و بررسی پاسخ ۴۰۳ برای کاربران غیرمرتبط.
+- چرا لازم بود: حفظ اعتماد کاربران به امتیازدهی و جلوگیری از ثبت نظرات مخدوش یا دسترسی‌های غیرمجاز طبق قوانین دامنه.
+- فایل‌های مهم: `backend/reviews/tests/__init__.py`, `backend/reviews/tests/test_models.py`, `backend/reviews/tests/test_forms.py`, `backend/reviews/tests/test_services.py`, `backend/reviews/tests/test_views.py`.
+- مفهوم جنگو/پایتون که استفاده شد: آزمون قیود یکتایی (`unique_together`/`UniqueConstraint`) و کنترل دسترسی بر مبنای نقش (`renter`/`owner`).
+- اگر استاد بپرسد: چگونه اطمینان حاصل شده که تنها طرفین اجاره تکمیل‌شده نظر می‌دهند؟ پاسخ: تست‌های اختصاصی بررسی می‌کنند که اگر اجاره در وضعیت دیگری باشد، کاربر به صفحه اجاره هدایت شده و پیام خطا دریافت می‌کند؛ و اگر کاربری غریبه اقدام به فراخوانی ویو نماید، خطای امنیتی ۴۰۳ دریافت می‌کند.
+
+---
+
+### 24edd4f — test(chat): modularize tests and cover conversation permissions and unread counts
+- تسک: P4-02
+- چه چیزی تغییر کرد: ایجاد پکیج `chat/tests/` با تفکیک به `test_models.py`، `test_forms.py` و `test_views.py`؛ سنجش دسترسی‌های امنیتی گفتگو (رد دسترسی کاربران غریبه با ۴۰۳، منع گفتگوی صاحب کالا با خودش)، شمارش پیام‌های خوانده‌نشده در صندوق پیام و خوانده‌شدن خودکار در صفحه گفتگو، و عدم ثبت متن محرمانه پیام در لاگ‌های سیستم.
+- چرا لازم بود: حفظ حریم خصوصی چت بین همسایگان و اطمینان از عملکرد صحیح اعلان‌ها و کنترل‌های دسترسی.
+- فایل‌های مهم: `backend/chat/tests/__init__.py`, `backend/chat/tests/test_models.py`, `backend/chat/tests/test_forms.py`, `backend/chat/tests/test_views.py`.
+- مفهوم جنگو/پایتون که استفاده شد: تست دسترسی‌های امنیتی ویوها، ممیزی لاگ با `assertLogs` و تضمین محرمانگی داده‌ها.
+- اگر استاد بپرسد: چگونه تست شده که محتوای پیام‌ها لاگ نمی‌شود؟ پاسخ: در `test_message_send_logs_without_message_body`، یک متن کلیدی محرمانه ارسال می‌شود و با بررسی خروجی لاگر `amanatyab.chat` اطمینان حاصل می‌شود که فقط شناسه پیام و فرستنده ثبت شده و متن پیام در هیچ‌کدام از لاگ‌ها وجود ندارد.
+
+---
+
+### ce8f469 — test(core): add cookie tamper, notification resilience, and decorator tests
+- تسک: P4-02
+- چه چیزی تغییر کرد: ساخت پکیج `core/tests/` با فایل‌های `test_cookies.py`، `test_notifications.py`، `test_middleware.py` و `test_decorators.py`؛ تست جامع کوکی‌های امضاشده کالاهای اخیر و مقاومت در برابر جعل و دستکاری (Tamper-proofing)، تست سیستم نوتیفیکیشن با استفاده از `mail.outbox` و `sms.outbox` در محیط حافظه، رفتار `skipped` در نبود شماره تلفن، عدم شکست درخواست کاربر هنگام خطای درگاه پیامک/ایمیل، و تست دکوراتور `verified_required`.
+- چرا لازم بود: الزامات صریح تسک P4-02 در خصوص تست دستکاری کوکی‌ها، تاب‌آوری سامانه اطلاع‌رسانی در صورت قطعی درگاه، و اعتبارسنجی دکوراتورهای امنیتی هسته.
+- فایل‌های مهم: `backend/core/tests/__init__.py`, `backend/core/tests/test_cookies.py`, `backend/core/tests/test_notifications.py`, `backend/core/tests/test_middleware.py`, `backend/core/tests/test_decorators.py`.
+- مفهوم جنگو/پایتون که استفاده شد: امضای دیجیتال داده‌ها با `django.core.signing.Signer`، تست تاب‌آوری در برابر خطا با Mock و Patch، بررسی صفوف تست در حافظه (`locmem`)، و تست Decorator با `RequestFactory`.
+- اگر استاد بپرسد: چرا قطعی درگاه پیامک نباید مانع ثبت‌نام یا ثبت کالا شود؟ پاسخ: ارسال پیامک یک فرآیند جانبی (Side Effect) است. شکست موقت درگاه ارائه‌دهنده سرویس پیامک نباید مانع از تکمیل تراکنش اصلی کاربر شود؛ بنابراین در `notify()` خطا مهار شده، وضعیت `failed` در دیتابیس لاگ می‌شود و فرآیند اصلی بدون کرش ادامه می‌یابد که این موضوع در آزمون‌های واحد به طور دقیق اثبات شده است.
+
+---
+
+### 9b2646a — docs: add how to run tests section to README
+- تسک: P4-02
+- چه چیزی تغییر کرد: افزودن بخش راهنمای اجرای آزمون‌های خودکار به زبان فارسی و انگلیسی در `README.md` با دستورات اجرای کل آزمون‌ها، اجرای تفکیکی بر اساس اپلیکیشن‌ها و سطح گزارش‌دهی (`-v 2`).
+- چرا لازم بود: معیار پذیرش تسک P4-02 مستلزم وجود بخش راهنمای نحوه اجرای تست‌ها در مستندات اصلی پروژه است.
+- فایل‌های مهم: `README.md`.
+- مفهوم جنگو/پایتون که استفاده شد: مستندسازی دستورات CLI فریم‌ورک آزمون جنگو (`python manage.py test`).
+- اگر استاد بپرسد: چگونه می‌توان فقط تست‌های یک ماژول مشخص مثل کوکی‌ها را اجرا کرد؟ پاسخ: با دستور `python manage.py test core.tests.test_cookies` می‌توان به طور مستقیم و مستقل فقط تست‌های مربوط به ماژول کوکی را اجرا کرد.
