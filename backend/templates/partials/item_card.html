@@ -1,7 +1,7 @@
 <div class="bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden flex flex-col hover:shadow-md transition duration-200 group">
     <!-- Image & Badges -->
     <a href="{% url 'catalog:item_detail' item.pk %}" class="block relative h-48 bg-gray-100 overflow-hidden">
-        {% with primary_img=item.images.all|first %}
+        {% with primary_img=item.primary_image %}
             {% if primary_img and primary_img.image %}
                 <img src="{{ primary_img.image.url }}" alt="{{ item.title }}" class="w-full h-full object-cover group-hover:scale-105 transition duration-300">
             {% else %}

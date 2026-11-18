@@ -121,21 +121,8 @@
             {% endfor %}
         </div>
     {% else %}
-        <!-- Empty State -->
-        <div class="bg-white rounded-3xl border border-gray-200 p-12 text-center max-w-lg mx-auto shadow-sm my-12">
-            <div class="w-16 h-16 bg-gray-100 text-gray-400 rounded-2xl flex items-center justify-center mx-auto mb-4">
-                <svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path>
-                </svg>
-            </div>
-            <h3 class="text-lg font-bold text-gray-900 mb-1">کالایی یافت نشد</h3>
-            <p class="text-sm text-gray-500 mb-6 leading-relaxed">
-                متأسفانه هیچ کالایی با فیلترها و مشخصات مد نظر شما پیدا نشد. می‌توانید با حذف برخی فیلترها یا جستجوی عنوانی دیگر دوباره امتحان کنید.
-            </p>
-            <a href="{% url 'catalog:item_list' %}" class="inline-flex items-center px-5 py-2.5 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium rounded-xl shadow-sm transition">
-                مشاهده همه کالاها
-            </a>
-        </div>
+        {% url 'catalog:item_list' as all_items_url %}
+        {% include "partials/empty_state.html" with icon="search" title="کالایی یافت نشد" message="متأسفانه هیچ کالایی با فیلترها و مشخصات مد نظر شما پیدا نشد. می‌توانید با حذف برخی فیلترها یا جستجوی عنوانی دیگر دوباره امتحان کنید." action_url=all_items_url action_text="مشاهده همه کالاها" %}
     {% endif %}
 </div>
 {% endblock %}
