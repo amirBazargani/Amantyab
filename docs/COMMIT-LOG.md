@@ -670,3 +670,33 @@
 - فایل‌های مهم: `README.md`.
 - مفهوم جنگو/پایتون که استفاده شد: مستندسازی دستورات CLI فریم‌ورک آزمون جنگو (`python manage.py test`).
 - اگر استاد بپرسد: چگونه می‌توان فقط تست‌های یک ماژول مشخص مثل کوکی‌ها را اجرا کرد؟ پاسخ: با دستور `python manage.py test core.tests.test_cookies` می‌توان به طور مستقیم و مستقل فقط تست‌های مربوط به ماژول کوکی را اجرا کرد.
+
+---
+
+### cb73d4f — refactor: extract template partials
+- تسک: P4-03
+- چه چیزی تغییر کرد: استخراج کامپوننت‌ها و پارشال‌های قالب شامل `form_field.html`، `rental_row.html`، `empty_state.html` و استفاده از `item_card.html` در تمامی صفحات؛ حذف بیش از ۵۰۰ خط کد تکراری در فرم‌ها، لیست‌ها و کارت‌های سفارش امانت.
+- چرا لازم بود: رعایت اصل DRY (Don't Repeat Yourself) در لایه قالب‌ها و جلوگیری از تکرار مارک‌آپ فرم‌ها، کارت‌ها و کدهای HTML مربوط به نشانگرهای وضعیت سفارش.
+- فایل‌های مهم: `backend/templates/partials/form_field.html`, `backend/templates/partials/rental_row.html`, `backend/templates/partials/empty_state.html`, `backend/templates/partials/item_card.html`, `backend/templates/rentals/my_rentals.html`, `backend/templates/rentals/owner_rentals.html`, `backend/templates/catalog/item_form.html`.
+- مفهوم جنگو/پایتون که استفاده شد: تگ `{% include %}` با پارامترهای اختصاصی (`with ...`), پارشال‌های ماژولار قالب، رندر یکپارچه خطاهای فرم و فیلدهای چک‌باکس/متنی.
+- اگر استاد بپرسد: چرا سطر سفارش‌های اجاره (`rental_row.html`) به عنوان پارشال استخراج شد؟ پاسخ: قالب‌های `my_rentals` و `owner_rentals` بیش از ۱۳۰ خط کد تکراری برای نمایش تصویر، عنوان، وضعیت، تاریخ‌ها و دکمه‌های اقدام داشتند. با استخراج پارشال و پاس دادن پارامتر `role="owner"` یا `role="renter"`، تمامی منطق بصری در یک نقطه متمرکز و نگهداری‌پذیر شد.
+
+---
+
+### 6d88835 — perf: fix N+1 queries and add query-count tests
+- تسک: P4-03
+- چه چیزی تغییر کرد: افزودن ویژگی بدون کوئری `primary_image` به مدل `Item`، اعمال بهینه‌سازی‌های `select_related` و `prefetch_related` در کوئری‌ست‌های `item_list`، `my_rentals`، `owner_rentals` و تجمیع کوئری‌های داشبورد ادمین با `aggregate(Count)`; افزودن تست‌های `assertNumQueries` برای تضمین پایداری تعداد کوئری‌ها.
+- چرا لازم بود: جلوگیری از معضل کوئری‌های N+1 هنگام پیمایش کالاها و سفارش‌ها در قالب‌ها و تحقق معیار پذیرش تسک (حداکثر ۵ کوئری برای فهرست ۲۵ کالا).
+- فایل‌های مهم: `backend/catalog/models.py`, `backend/catalog/views.py`, `backend/rentals/views.py`, `backend/catalog/tests/test_views.py`, `backend/rentals/tests/test_views.py`.
+- مفهوم جنگو/پایتون که استفاده شد: متدهای `select_related` (برای روابط Foreign Key با SQL JOIN) و `prefetch_related` (برای روابط معکوس و چندبه‌چند)، استفاده از کش شیء پیش‌واکشی‌شده (`_prefetched_objects_cache`) در سطح پایتون، تجمیع آماری با `Count` در دیتابیس به جای کوئری در حلقه، و متد اعتبارسنجی `assertNumQueries` در آزمون‌های جنگو.
+- اگر استاد بپرسد: چگونه ویژگی `primary_image` مانع N+1 می‌شود؟ پاسخ: در صورتی که رابطه `images` قبلاً با `prefetch_related("images")` پیش‌واکشی شده باشد، ویژگی `primary_image` از کش درون‌حافظه‌ای پایتون (`self._prefetched_objects_cache`) برای یافتن تصویر شاخص استفاده می‌کند و هیچ کوئری SQL جدیدی به دیتابیس ارسال نمی‌کند.
+
+---
+
+### f53c3a6 — perf(catalog): resize uploaded images
+- تسک: P4-03
+- چه چیزی تغییر کرد: پیاده‌سازی متد `save()` و `_resize_image()` در مدل `ItemImage` با استفاده از کتابخانه Pillow؛ تغییر اندازه خودکار و متناسب تصاویر آپلودی به حداکثر ۱۲۰۰ پیکسل در صورت فراتر رفتن ابعاد؛ به همراه افزودن آزمون‌های واحد اختصاصی در `catalog/tests/test_models.py`.
+- چرا لازم بود: کاهش حجم فایل‌های آپلودی، بهینه‌سازی سرعت بارگذاری صفحات کاتالوگ و جزئیات کالا و صرفه‌جویی در فضای ذخیره‌سازی سرور.
+- فایل‌های مهم: `backend/catalog/models.py`, `backend/catalog/tests/test_models.py`.
+- مفهوم جنگو/پایتون که استفاده شد: اورراید متد `save()` مدل جنگو، استفاده از خصوصیت `_committed` در `FieldFile` برای تشخیص فایل جدید، پردازش باکت تصویر در حافظه رم با `io.BytesIO` و `ContentFile`، تغییر مقیاس با الگوریتم باکیفیت `LANCZOS` و فشرده‌سازی با کیفیت ۸۵ در فرمت JPEG.
+- اگر استاد بپرسد: چرا شرط `not getattr(self.image, '_committed', True)` استفاده شده است؟ پاسخ: برای اینکه عملیات بازکردن، تغییر سایز و فشرده‌سازی تصویر با Pillow فقط یک‌بار و در لحظه آپلود اولیه فایل جدید اجرا شود و در ذخیره‌سازی‌های بعدی رکورد (مانند تغییر اولویت یا تصویر شاخص)، تصویر ذخیره‌شده مجدداً بازخوانی و فشرده نشود.
