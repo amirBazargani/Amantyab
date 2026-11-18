@@ -53,6 +53,16 @@ def notify(user, event, context=None, *, item=None, rental=None):
     except Exception as exc:
         body = f"Notification event: {event}"
 
+    try:
+        email_body = render_to_string(f"notifications/{event}_email_body.txt", ctx).strip()
+    except Exception:
+        email_body = body
+
+    try:
+        sms_body = render_to_string(f"notifications/{event}_sms_body.txt", ctx).strip()
+    except Exception:
+        sms_body = body
+
     logs = []
     user_id = user.pk if user else None
 
@@ -65,7 +75,7 @@ def notify(user, event, context=None, *, item=None, rental=None):
             event=event,
             recipient="",
             subject=subject,
-            body=body,
+            body=email_body,
             status="skipped",
             error="User has no email address.",
             item=item,
@@ -82,7 +92,7 @@ def notify(user, event, context=None, *, item=None, rental=None):
         try:
             send_mail(
                 subject=subject,
-                message=body,
+                message=email_body,
                 from_email=getattr(settings, "DEFAULT_FROM_EMAIL", "info@amanatyab.ir"),
                 recipient_list=[recipient_email],
                 fail_silently=False,
@@ -93,7 +103,7 @@ def notify(user, event, context=None, *, item=None, rental=None):
                 event=event,
                 recipient=recipient_email,
                 subject=subject,
-                body=body,
+                body=email_body,
                 status="sent",
                 item=item,
                 rental=rental,
@@ -111,7 +121,7 @@ def notify(user, event, context=None, *, item=None, rental=None):
                 event=event,
                 recipient=recipient_email,
                 subject=subject,
-                body=body,
+                body=email_body,
                 status="failed",
                 error=str(exc),
                 item=item,
@@ -135,7 +145,7 @@ def notify(user, event, context=None, *, item=None, rental=None):
             event=event,
             recipient="",
             subject=subject,
-            body=body,
+            body=sms_body,
             status="skipped",
             error="User has no phone number.",
             item=item,
@@ -151,14 +161,14 @@ def notify(user, event, context=None, *, item=None, rental=None):
     else:
         try:
             sms_backend = get_sms_backend()
-            sms_backend.send_sms(recipient_phone, body)
+            sms_backend.send_sms(recipient_phone, sms_body)
             sms_log = NotificationLog.objects.create(
                 user=user,
                 channel="sms",
                 event=event,
                 recipient=recipient_phone,
                 subject=subject,
-                body=body,
+                body=sms_body,
                 status="sent",
                 item=item,
                 rental=rental,
@@ -176,7 +186,7 @@ def notify(user, event, context=None, *, item=None, rental=None):
                 event=event,
                 recipient=recipient_phone,
                 subject=subject,
-                body=body,
+                body=sms_body,
                 status="failed",
                 error=str(exc),
                 item=item,

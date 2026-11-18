@@ -1,13 +1,18 @@
 import logging
 
+from django.conf import settings
 from django.contrib import messages
 from django.contrib.auth import get_user_model, login, logout
 from django.contrib.auth.decorators import login_required
+from django.core.mail import send_mail
 from django.db.models import Avg
 from django.shortcuts import get_object_or_404, redirect, render
+from django.template.loader import render_to_string
+from django.urls import reverse
 from django.utils.http import url_has_allowed_host_and_scheme
 
 from accounts.forms import LoginForm, ProfileForm, SignUpForm
+from accounts.tokens import generate_verification_token, verify_token
 from core.notifications import notify
 from reviews.models import Review
 
@@ -27,10 +32,14 @@ def signup_view(request):
             user = form.save()
             logger.info("New user registered: user_id=%s username=%s", user.pk, user.username)
             login(request, user)
-            notify(user, "signup_confirmation")
+            token = generate_verification_token(user)
+            verification_url = request.build_absolute_uri(
+                reverse("accounts:verify_email", kwargs={"token": token})
+            )
+            notify(user, "signup_confirmation", context={"verification_url": verification_url})
             messages.success(
                 request,
-                f"خوش آمدید {user.first_name or user.username}! حساب کاربری شما با موفقیت ایجاد شد.",
+                f"خوش آمدید {user.first_name or user.username}! حساب کاربری شما ایجاد شد. لینک تایید ایمیل برای شما ارسال گردید.",
             )
             return redirect("accounts:profile")
         else:
@@ -144,3 +153,99 @@ def public_profile_view(request, username):
             "review_count": received_reviews.count(),
         },
     )
+
+
+def verify_email(request, token):
+    """Verify user's email address using a signed token."""
+    user, error_code = verify_token(token)
+    if error_code == "expired":
+        logger.warning("Email verification link expired: ip=%s", request.META.get("REMOTE_ADDR"))
+        messages.error(
+            request,
+            "لینک تایید ایمیل منقضی شده است (اعتبار لینک‌ها ۲۴ ساعت است). لطفاً مجدداً درخواست ارسال لینک تایید دهید.",
+        )
+        return render(
+            request,
+            "accounts/verify_sent.html",
+            {"status": "expired", "user": request.user if request.user.is_authenticated else None},
+            status=400,
+        )
+    elif error_code or not user:
+        security_logger.warning(
+            "Email verification failed (invalid token): ip=%s",
+            request.META.get("REMOTE_ADDR"),
+        )
+        messages.error(
+            request,
+            "لینک تایید ایمیل نامعتبر است یا مخدوش شده است.",
+        )
+        return render(
+            request,
+            "accounts/verify_sent.html",
+            {"status": "invalid", "user": request.user if request.user.is_authenticated else None},
+            status=400,
+        )
+
+    if user.is_email_verified:
+        logger.info("User email already verified: user_id=%s", user.pk)
+        messages.info(request, "ایمیل شما قبلاً تایید شده است.")
+    else:
+        user.is_email_verified = True
+        user.save(update_fields=["is_email_verified"])
+        logger.info("Email verified: user_id=%s username=%s email=%s", user.pk, user.username, user.email)
+        security_logger.info(
+            "Email verification success: user_id=%s email=%s ip=%s",
+            user.pk,
+            user.email,
+            request.META.get("REMOTE_ADDR"),
+        )
+        messages.success(
+            request,
+            "ایمیل شما با موفقیت تایید شد! اکنون می‌توانید کالا ثبت کنید، اجاره دهید یا درخواست اجاره و پیام ارسال نمایید.",
+        )
+
+    if request.user.is_authenticated:
+        return redirect("accounts:profile")
+    return redirect("accounts:login")
+
+
+@login_required
+def resend_verification(request):
+    """Resend email verification link to authenticated user."""
+    if request.user.is_email_verified:
+        messages.info(request, "ایمیل شما قبلاً تایید شده است.")
+        return redirect("accounts:profile")
+
+    if not request.user.email:
+        messages.error(request, "حساب کاربری شما فاقد آدرس ایمیل است. لطفاً ابتدا در پروفایل ایمیل خود را ثبت کنید.")
+        return redirect("accounts:profile")
+
+    if request.method == "POST":
+        token = generate_verification_token(request.user)
+        verification_url = request.build_absolute_uri(
+            reverse("accounts:verify_email", kwargs={"token": token})
+        )
+        subject = "تایید آدرس ایمیل — امانت‌یاب"
+        body = render_to_string(
+            "emails/verify.txt",
+            {"user": request.user, "verification_url": verification_url},
+        ).strip()
+
+        try:
+            send_mail(
+                subject=subject,
+                message=body,
+                from_email=getattr(settings, "DEFAULT_FROM_EMAIL", "info@amanatyab.ir"),
+                recipient_list=[request.user.email],
+                fail_silently=False,
+            )
+            logger.info("Verification email resent: user_id=%s email=%s", request.user.pk, request.user.email)
+            messages.success(request, f"لینک تایید جدید به آدرس {request.user.email} ارسال شد.")
+        except Exception as exc:
+            logger.warning("Failed to resend verification email: user_id=%s error=%s", request.user.pk, exc)
+            messages.error(request, "خطا در ارسال ایمیل تایید. لطفاً لحظاتی بعد مجدداً تلاش کنید.")
+
+        return render(request, "accounts/verify_sent.html", {"user": request.user, "resent": True})
+
+    return render(request, "accounts/verify_sent.html", {"user": request.user, "resent": False})
+

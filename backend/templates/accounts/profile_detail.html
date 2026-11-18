@@ -12,9 +12,19 @@
                     {{ profile_user.first_name|first|default:profile_user.username|first|upper }}
                 </div>
                 <div>
-                    <h1 class="text-2xl font-bold text-gray-900">
-                        {{ profile_user.get_full_name|default:profile_user.username }}
-                    </h1>
+                    <div class="flex items-center gap-2 justify-center sm:justify-start">
+                        <h1 class="text-2xl font-bold text-gray-900">
+                            {{ profile_user.get_full_name|default:profile_user.username }}
+                        </h1>
+                        {% if profile_user.is_email_verified %}
+                            <span class="inline-flex items-center gap-1 text-xs text-emerald-700 bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded-full font-medium" title="ایمیل کاربر تایید شده است">
+                                <svg class="w-3.5 h-3.5 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
+                                </svg>
+                                کاربر تایید شده
+                            </span>
+                        {% endif %}
+                    </div>
                     <p class="text-sm text-gray-500 dir-ltr text-right mt-0.5">@{{ profile_user.username }}</p>
 
                     <!-- City and Location -->
