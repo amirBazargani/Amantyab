@@ -137,6 +137,17 @@ class SignUpForm(UserCreationForm):
 
 
 class LoginForm(AuthenticationForm):
+    remember_me = forms.BooleanField(
+        required=False,
+        initial=True,
+        label="مرا به خاطر بسپار",
+        widget=forms.CheckboxInput(
+            attrs={
+                "class": "h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded cursor-pointer",
+            }
+        ),
+    )
+
     error_messages = {
         "invalid_login": "نام کاربری یا رمز عبور وارد شده اشتباه است.",
         "inactive": "حساب کاربری شما غیرفعال شده است.",

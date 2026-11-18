@@ -51,3 +51,21 @@ Or run as a persistent background service using the `--loop` flag:
 ```cmd
 C:\path\to\project\.venv\Scripts\python.exe C:\path\to\project\backend\manage.py send_rental_reminders --loop --interval 60
 ```
+
+### Session Cleanup (`clearsessions`)
+Since Django uses database-backed sessions (`django.contrib.sessions.backends.db`), expired session records accumulate in the database over time. Run `clearsessions` periodically to clean them up:
+
+```bash
+python manage.py clearsessions
+```
+
+#### Scheduled Cleanup (cron / Task Scheduler)
+- **Linux / macOS (cron — daily at 03:00)**:
+  ```cron
+  0 3 * * * cd /path/to/project/backend && /path/to/project/.venv/bin/python manage.py clearsessions >> /path/to/project/logs/clearsessions.log 2>&1
+  ```
+- **Windows (Task Scheduler — daily at 03:00)**:
+  ```cmd
+  schtasks /create /tn "AmanatyabClearSessions" /tr "C:\path\to\project\.venv\Scripts\python.exe C:\path\to\project\backend\manage.py clearsessions" /sc daily /st 03:00
+  ```
+

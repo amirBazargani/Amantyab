@@ -249,3 +249,83 @@ class AccountsAuthTests(TestCase):
         self.assertContains(response, "تهران")
         self.assertContains(response, "دریل چکشی رونیکس")
         self.assertNotContains(response, "کالای غیرفعال")
+
+
+class SessionManagementTests(TestCase):
+    def setUp(self):
+        self.user = User.objects.create_user(
+            username="sessionuser",
+            email="sessionuser@example.com",
+            password="StrongPassword123!",
+            first_name="مهدی",
+            phone="09124445566",
+        )
+
+    def test_session_settings_configured(self):
+        from django.conf import settings
+
+        self.assertEqual(settings.SESSION_ENGINE, "django.contrib.sessions.backends.db")
+        self.assertEqual(settings.SESSION_COOKIE_AGE, 1209600)  # 2 weeks
+        self.assertTrue(settings.SESSION_COOKIE_HTTPONLY)
+
+    def test_login_remember_me_checked_uses_default_cookie_age(self):
+        login_url = reverse("accounts:login")
+        response = self.client.post(
+            login_url,
+            {
+                "username": "sessionuser",
+                "password": "StrongPassword123!",
+                "remember_me": "on",
+            },
+            follow=True,
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertTrue(response.context["user"].is_authenticated)
+
+        session = self.client.session
+        # Should NOT expire at browser close
+        self.assertFalse(session.get_expire_at_browser_close())
+        # Age should be 2 weeks (1209600 seconds)
+        self.assertEqual(session.get_expiry_age(), 1209600)
+
+    def test_login_remember_me_unchecked_expires_at_browser_close(self):
+        login_url = reverse("accounts:login")
+        response = self.client.post(
+            login_url,
+            {
+                "username": "sessionuser",
+                "password": "StrongPassword123!",
+                # remember_me is omitted / unchecked
+            },
+            follow=True,
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertTrue(response.context["user"].is_authenticated)
+
+        session = self.client.session
+        # Must expire at browser close
+        self.assertTrue(session.get_expire_at_browser_close())
+
+    def test_logout_clears_session(self):
+        login_url = reverse("accounts:login")
+        self.client.post(
+            login_url,
+            {
+                "username": "sessionuser",
+                "password": "StrongPassword123!",
+                "remember_me": "on",
+            },
+        )
+        # Store arbitrary data in session
+        session = self.client.session
+        session["catalog_search_filters"] = {"q": "دریل"}
+        session.save()
+
+        logout_url = reverse("accounts:logout")
+        response = self.client.post(logout_url, follow=True)
+        self.assertEqual(response.status_code, 200)
+
+        # After logout, session should be flushed
+        self.assertNotIn("_auth_user_id", self.client.session)
+        self.assertNotIn("catalog_search_filters", self.client.session)
+
