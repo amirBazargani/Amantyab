@@ -1,6 +1,7 @@
 from decimal import Decimal
 from urllib.parse import quote
 from django.contrib.auth import get_user_model
+from django.contrib.auth.models import AnonymousUser
 from django.http import HttpRequest, HttpResponse
 from django.test import Client, RequestFactory, TestCase
 from django.urls import reverse
@@ -15,6 +16,8 @@ from core.cookies import (
     get_recent_item_ids,
     set_last_city,
 )
+from core.middleware import RequestLogMiddleware
+from core.notifications import mask_email, mask_phone, notify
 
 User = get_user_model()
 
@@ -173,3 +176,138 @@ class HomePageCookieViewTests(TestCase):
         response = self.client.get(reverse("core:home"))
         self.assertEqual(response.status_code, 200)
         self.assertNotContains(response, "کالاهای اخیراً مشاهده‌شده")
+
+
+class RequestLogMiddlewareTests(TestCase):
+    """Tests for RequestLogMiddleware."""
+
+    def setUp(self):
+        self.factory = RequestFactory()
+        self.user = User.objects.create_user(
+            username="loguser",
+            email="loguser@example.com",
+            phone="09121112233",
+            password="password123",
+        )
+
+    def test_anonymous_request_logged(self):
+        middleware = RequestLogMiddleware(lambda req: HttpResponse("OK", status=200))
+        request = self.factory.get("/some/path/?page=1")
+        request.user = AnonymousUser()
+
+        with self.assertLogs("amanatyab.core", level="INFO") as cm:
+            response = middleware(request)
+            self.assertEqual(response.status_code, 200)
+
+        output = " ".join(cm.output)
+        self.assertIn("GET /some/path/?page=1", output)
+        self.assertIn("user=anonymous", output)
+        self.assertIn("status=200", output)
+        self.assertIn("duration=", output)
+
+    def test_authenticated_request_logged(self):
+        middleware = RequestLogMiddleware(lambda req: HttpResponse("OK", status=200))
+        request = self.factory.post("/catalog/create/")
+        request.user = self.user
+
+        with self.assertLogs("amanatyab.core", level="INFO") as cm:
+            response = middleware(request)
+            self.assertEqual(response.status_code, 200)
+
+        output = " ".join(cm.output)
+        self.assertIn("POST /catalog/create/", output)
+        self.assertIn(f"user={self.user.pk}", output)
+        self.assertIn("status=200", output)
+        self.assertIn("duration=", output)
+
+    def test_exception_in_view_logs_exception_and_raises(self):
+        def failing_view(req):
+            raise ValueError("Something broke")
+
+        middleware = RequestLogMiddleware(failing_view)
+        request = self.factory.get("/broken/")
+        request.user = self.user
+
+        with self.assertLogs("amanatyab.core", level="ERROR") as cm:
+            with self.assertRaises(ValueError):
+                middleware(request)
+
+        output = " ".join(cm.output)
+        self.assertIn("GET /broken/", output)
+        self.assertIn(f"user={self.user.pk}", output)
+        self.assertIn("status=500", output)
+
+    def test_real_client_request_writes_to_log(self):
+        with self.assertLogs("amanatyab.core", level="INFO") as cm:
+            response = self.client.get(reverse("core:home"))
+            self.assertEqual(response.status_code, 200)
+
+        output = " ".join(cm.output)
+        self.assertIn("GET /", output)
+        self.assertIn("status=200", output)
+
+
+class NotificationLoggingTests(TestCase):
+    """Tests for phone/email masking and notification logging behavior."""
+
+    def setUp(self):
+        self.user = User.objects.create_user(
+            username="notifuser",
+            email="notifuser@example.com",
+            phone="09123456789",
+            password="password123",
+        )
+
+    def test_mask_phone(self):
+        self.assertEqual(mask_phone("09123456789"), "********789")
+        self.assertEqual(mask_phone("123"), "123")
+        self.assertEqual(mask_phone(""), "")
+        self.assertEqual(mask_phone(None), "")
+
+    def test_mask_email(self):
+        self.assertEqual(mask_email("notifuser@example.com"), "@example.com")
+        self.assertEqual(mask_email("someone@sub.domain.org"), "@sub.domain.org")
+        self.assertEqual(mask_email(""), "")
+        self.assertEqual(mask_email(None), "")
+        self.assertEqual(mask_email("invalid_email"), "")
+
+    def test_notify_logs_masked_recipients_and_never_logs_body(self):
+        secret_content = "SECRET_SUPER_CONFIDENTIAL_TOKEN_12345"
+
+        with self.assertLogs("amanatyab.core", level="INFO") as cm:
+            notify(self.user, "test_event", context={"secret": secret_content})
+
+        output = " ".join(cm.output)
+
+        # Must log attempts to amanatyab.core with event, channel, user id, status
+        self.assertIn("event=test_event", output)
+        self.assertIn("channel=email", output)
+        self.assertIn("channel=sms", output)
+        self.assertIn(f"user_id={self.user.pk}", output)
+        self.assertIn("status=sent", output)
+
+        # Phone numbers are masked (last 3 digits visible)
+        self.assertIn("********789", output)
+        self.assertNotIn("09123456789", output)
+
+        # Emails show only the domain
+        self.assertIn("@example.com", output)
+        self.assertNotIn("notifuser@", output)
+
+        # Message bodies are NEVER logged
+        self.assertNotIn(secret_content, output)
+
+    def test_notify_skipped_logging(self):
+        user_no_contact = User.objects.create_user(
+            username="nocontact",
+            email="",
+            phone="",
+            password="password123",
+        )
+        with self.assertLogs("amanatyab.core", level="INFO") as cm:
+            notify(user_no_contact, "test_skip_event")
+
+        output = " ".join(cm.output)
+        self.assertIn("event=test_skip_event", output)
+        self.assertIn("status=skipped", output)
+
