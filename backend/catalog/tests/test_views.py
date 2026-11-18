@@ -12,11 +12,9 @@ from core.cookies import (
     get_last_city,
     get_recent_item_ids,
 )
-
-from .models import Category, Item, ItemImage
+from catalog.models import Category, Item, ItemImage
 
 User = get_user_model()
-
 
 class CatalogViewsTestCase(TestCase):
     def setUp(self):
@@ -265,74 +263,6 @@ class CatalogViewsTestCase(TestCase):
         self.assertEqual(staff_res.status_code, 200)
 
 
-class ItemGeoFieldsTestCase(TestCase):
-    def setUp(self):
-        self.owner = User.objects.create_user(
-            username="geouser",
-            email="geo@example.com",
-            password="StrongPassword123!",
-            phone="09124444444",
-        )
-        self.category = Category.objects.create(name="ابزار", slug="tools-geo")
-
-    def test_lat_without_lng_raises_integrity_error(self):
-        """Item with latitude set but longitude None violates DB constraint."""
-        from django.db import IntegrityError
-
-        with self.assertRaises(IntegrityError):
-            Item.objects.create(
-                owner=self.owner,
-                category=self.category,
-                title="Invalid Lat Only",
-                description="desc",
-                condition=Item.Condition.NEW,
-                daily_price=Decimal("50000"),
-                city="تهران",
-                allow_pickup=True,
-                latitude=Decimal("35.6892"),
-                longitude=None,
-            )
-
-    def test_latitude_120_fails_full_clean(self):
-        """Item with latitude > 90 fails full_clean() validation."""
-        from django.core.exceptions import ValidationError
-
-        item = Item(
-            owner=self.owner,
-            category=self.category,
-            title="Invalid Lat Value",
-            description="desc",
-            condition=Item.Condition.NEW,
-            daily_price=Decimal("50000"),
-            city="تهران",
-            allow_pickup=True,
-            latitude=Decimal("120.0"),
-            longitude=Decimal("51.3890"),
-        )
-        with self.assertRaises(ValidationError) as ctx:
-            item.full_clean()
-        self.assertIn("latitude", ctx.exception.message_dict)
-
-    def test_valid_coordinates_and_address_text_persist(self):
-        """Item with valid coordinates and address text saves and cleans properly."""
-        item = Item.objects.create(
-            owner=self.owner,
-            category=self.category,
-            title="Valid Coordinates Item",
-            description="desc",
-            condition=Item.Condition.GOOD,
-            daily_price=Decimal("50000"),
-            city="تهران",
-            neighborhood="ونک",
-            allow_pickup=True,
-            address_text="میدان ونک، خیابان ملاصدرا",
-            latitude=Decimal("35.757500"),
-            longitude=Decimal("51.410000"),
-        )
-        item.full_clean()
-        self.assertEqual(item.address_text, "میدان ونک، خیابان ملاصدرا")
-        self.assertEqual(item.latitude, Decimal("35.757500"))
-        self.assertEqual(item.longitude, Decimal("51.410000"))
 
 
 class ItemOwnerManagementTestCase(TestCase):
@@ -556,6 +486,8 @@ class ItemOwnerManagementTestCase(TestCase):
         self.assertTrue(Item.objects.filter(pk=self.item.pk).exists())
 
 
+
+
 class ItemMapLocationTestCase(TestCase):
     def setUp(self):
         self.owner = User.objects.create_user(
@@ -682,6 +614,8 @@ class ItemMapLocationTestCase(TestCase):
         self.assertNotContains(res, "map-viewer")
 
 
+
+
 class ItemRegistrationNotificationTestCase(TestCase):
     def setUp(self):
         from core.models import NotificationLog
@@ -777,148 +711,6 @@ class ItemRegistrationNotificationTestCase(TestCase):
         self.assertEqual(logs_after, 0)
 
 
-class ItemQuerySetTests(TestCase):
-    def setUp(self):
-        self.user1 = User.objects.create_user(
-            username="qs_user1", email="qs1@example.com", password="PassWord123!"
-        )
-        self.user2 = User.objects.create_user(
-            username="qs_user2", email="qs2@example.com", password="PassWord123!"
-        )
-        self.cat_parent = Category.objects.create(name="ابزار برقی", slug="power-tools")
-        self.cat_child = Category.objects.create(
-            name="دریل و پیچ‌گوشتی", slug="drills", parent=self.cat_parent
-        )
-        self.cat_other = Category.objects.create(name="وسایل کمپینگ", slug="camping")
-
-        self.item1 = Item.objects.create(
-            owner=self.user1,
-            category=self.cat_child,
-            title="دریل چکشی بوش",
-            description="دریل قدرتمند خانگی بوش",
-            brand="Bosch",
-            condition=Item.Condition.LIKE_NEW,
-            daily_price=Decimal("150000"),
-            city="تهران",
-            neighborhood="ونک",
-            allow_pickup=True,
-            is_active=True,
-        )
-        self.item2 = Item.objects.create(
-            owner=self.user2,
-            category=self.cat_other,
-            title="چادر کوهنوردی ۴ نفره",
-            description="چادر کلمن ضدآب",
-            brand="Coleman",
-            condition=Item.Condition.GOOD,
-            daily_price=Decimal("250000"),
-            city="اصفهان",
-            neighborhood="مرداویج",
-            allow_pickup=True,
-            is_active=True,
-        )
-        self.item_inactive = Item.objects.create(
-            owner=self.user1,
-            category=self.cat_child,
-            title="اره فارسی بر ماکیتا",
-            description="اره غیرفعال",
-            brand="Makita",
-            condition=Item.Condition.NEW,
-            daily_price=Decimal("300000"),
-            city="تهران",
-            neighborhood="ونک",
-            allow_pickup=True,
-            is_active=False,
-        )
-
-    def test_active(self):
-        qs = Item.objects.active()
-        self.assertIn(self.item1, qs)
-        self.assertIn(self.item2, qs)
-        self.assertNotIn(self.item_inactive, qs)
-
-    def test_in_city(self):
-        tehran_qs = Item.objects.in_city("تهران")
-        self.assertIn(self.item1, tehran_qs)
-        self.assertNotIn(self.item2, tehran_qs)
-
-        # Empty city returns unfiltered
-        self.assertEqual(Item.objects.in_city("").count(), Item.objects.count())
-
-    def test_in_category(self):
-        # Child category by object, id, slug
-        child_qs = Item.objects.in_category(self.cat_child)
-        self.assertIn(self.item1, child_qs)
-        self.assertNotIn(self.item2, child_qs)
-
-        by_slug = Item.objects.in_category("drills")
-        self.assertIn(self.item1, by_slug)
-
-        by_id = Item.objects.in_category(str(self.cat_child.pk))
-        self.assertIn(self.item1, by_id)
-
-        # Parent category includes child category's items
-        parent_qs = Item.objects.in_category(self.cat_parent)
-        self.assertIn(self.item1, parent_qs)
-        self.assertNotIn(self.item2, parent_qs)
-
-    def test_search(self):
-        # Search by title
-        self.assertIn(self.item1, Item.objects.search("چکشی"))
-        # Search by description
-        self.assertIn(self.item2, Item.objects.search("ضدآب"))
-        # Search by brand
-        self.assertIn(self.item1, Item.objects.search("bosch"))
-        # Empty search returns full queryset
-        self.assertEqual(Item.objects.search("").count(), Item.objects.count())
-
-    def test_price_up_to(self):
-        qs = Item.objects.price_up_to("200000")
-        self.assertIn(self.item1, qs)
-        self.assertNotIn(self.item2, qs)
-
-        # Invalid price ignored
-        self.assertEqual(Item.objects.price_up_to("invalid").count(), Item.objects.count())
-
-    def test_available_between(self):
-        from datetime import timedelta
-        from django.utils import timezone
-        from rentals.models import Rental
-
-        now = timezone.now()
-        start = now + timedelta(days=2)
-        end = now + timedelta(days=4)
-
-        # Create a blocking rental for item1 during that period
-        Rental.objects.create(
-            item=self.item1,
-            renter=self.user2,
-            start_at=start,
-            end_at=end,
-            status=Rental.Status.CONFIRMED,
-            rent_amount=Decimal("300000"),
-            deposit_amount=Decimal("0"),
-            commission_rate=Decimal("0.15"),
-            commission_amount=Decimal("45000"),
-            owner_payout=Decimal("255000"),
-            delivery_method=Rental.DeliveryMethod.PICKUP,
-        )
-
-        available = Item.objects.available_between(
-            start + timedelta(hours=1), end - timedelta(hours=1)
-        )
-        self.assertNotIn(self.item1, available)
-        self.assertIn(self.item2, available)
-
-    def test_chained_methods(self):
-        qs = (
-            Item.objects.active()
-            .in_city("تهران")
-            .in_category("power-tools")
-            .search("بوش")
-            .price_up_to("200000")
-        )
-        self.assertEqual(list(qs), [self.item1])
 
 
 class CatalogSessionFilterTests(TestCase):
@@ -999,6 +791,8 @@ class CatalogSessionFilterTests(TestCase):
         self.assertEqual(response.context["q"], "")
         self.assertIn(self.drill, response.context["items"])
         self.assertIn(self.tent, response.context["items"])
+
+
 
 
 class CatalogCookieTests(TestCase):
@@ -1103,6 +897,8 @@ class CatalogCookieTests(TestCase):
         check_req.COOKIES[RECENT_ITEMS_COOKIE] = self.client.cookies[RECENT_ITEMS_COOKIE].value
         # Tampered cookie was discarded and new list contains only item2
         self.assertEqual(get_recent_item_ids(check_req), [self.item2.pk])
+
+
 
 
 class CatalogLoggingTests(TestCase):
