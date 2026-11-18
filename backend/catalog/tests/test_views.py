@@ -225,6 +225,37 @@ class CatalogViewsTestCase(TestCase):
         self.assertEqual(res_mismatch.context["total_count"], 0)
         self.assertContains(res_mismatch, "کالایی یافت نشد")
 
+    def test_item_list_query_count_under_limit(self):
+        """
+        Verify that browsing item_list with 25 items executes at most 5 database queries,
+        guaranteeing elimination of N+1 queries.
+        """
+        extra_items = [
+            Item(
+                owner=self.owner,
+                category=self.cat_tools if i % 2 == 0 else self.cat_camping,
+                title=f"کالای آزمایشی بهینه‌سازی {i}",
+                description="توضیحات تست بهینه‌سازی کوئری",
+                daily_price=Decimal("45000"),
+                city="تهران",
+                neighborhood="ونک",
+                is_active=True,
+            )
+            for i in range(25)
+        ]
+        Item.objects.bulk_create(extra_items)
+        created_items = list(Item.objects.filter(title__startswith="کالای آزمایشی بهینه‌سازی"))
+        ItemImage.objects.bulk_create([
+            ItemImage(item=item, image="items/dummy.jpg", is_primary=True)
+            for item in created_items
+        ])
+
+        # Must execute <= 5 queries (categories, cities, items, images, and session if any)
+        with self.assertNumQueries(4):
+            response = self.client.get(reverse("catalog:item_list"))
+            self.assertEqual(response.status_code, 200)
+            self.assertGreaterEqual(response.context["total_count"], 25)
+
     def test_item_detail_shows_complete_information(self):
         """Detail page shows images, prices, deposit, owner, and delivery options."""
         response = self.client.get(reverse("catalog:item_detail", args=[self.item_drill.pk]))

@@ -225,6 +225,20 @@ class Item(models.Model):
                 _("Latitude and longitude must either both be set or both be empty.")
             )
 
+    @property
+    def primary_image(self):
+        """
+        Return the primary image of the item.
+        Uses in-memory prefetched images cache if available to prevent N+1 queries.
+        """
+        if hasattr(self, "_prefetched_objects_cache") and "images" in self._prefetched_objects_cache:
+            for img in self.images.all():
+                if img.is_primary:
+                    return img
+            images = list(self.images.all())
+            return images[0] if images else None
+        return self.images.filter(is_primary=True).first() or self.images.first()
+
 
 class ItemImage(models.Model):
     item = models.ForeignKey(
