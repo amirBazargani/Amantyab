@@ -9,6 +9,7 @@ from django.shortcuts import get_object_or_404, redirect, render
 from django.utils import timezone
 from django.views.decorators.http import require_POST
 
+from core.cookies import add_recent_item_id, set_last_city
 from core.notifications import notify
 from reviews.models import Review
 
@@ -81,7 +82,10 @@ def item_list(request):
         "max_price": max_price_param,
         "total_count": queryset.count(),
     }
-    return render(request, "catalog/item_list.html", context)
+    response = render(request, "catalog/item_list.html", context)
+    if city:
+        set_last_city(response, city)
+    return response
 
 
 def item_detail(request, pk):
@@ -125,7 +129,11 @@ def item_detail(request, pk):
         "is_owner": request.user.is_authenticated and request.user == item.owner,
         "can_manage": is_owner_or_staff,
     }
-    return render(request, "catalog/item_detail.html", context)
+    response = render(request, "catalog/item_detail.html", context)
+    add_recent_item_id(response, request, item.pk)
+    if item.city:
+        set_last_city(response, item.city)
+    return response
 
 
 @login_required
