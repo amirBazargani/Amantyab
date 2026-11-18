@@ -18,7 +18,7 @@
         
         <!-- Search Bar -->
         {% url 'catalog:item_list' as item_list_url %}
-        <form action="{{ item_list_url|default:'/catalog/' }}" method="get" class="max-w-xl mx-auto flex flex-col sm:flex-row gap-2 pt-2">
+        <form action="{{ item_list_url|default:'/catalog/' }}" method="get" class="max-w-2xl mx-auto flex flex-col sm:flex-row gap-2 pt-2">
             <div class="relative flex-grow">
                 <input type="text" name="q" placeholder="چه وسیله‌ای نیاز دارید؟ (مثلاً: دریل، چادر مسافرتی، نردبان...)"
                        class="w-full pl-4 pr-11 py-3.5 bg-white border border-gray-300 rounded-2xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent shadow-sm">
@@ -28,12 +28,32 @@
                     </svg>
                 </div>
             </div>
+
+            <!-- City Selector with last_city pre-selected -->
+            <div class="sm:w-44">
+                <select name="city" id="home-city-select"
+                        class="w-full py-3.5 px-3 bg-white border border-gray-300 rounded-2xl text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500 shadow-sm">
+                    <option value="">همه شهرها</option>
+                    {% for c in cities %}
+                        <option value="{{ c }}" {% if c == last_city %}selected{% endif %}>{{ c }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+
             <button type="submit" class="bg-blue-600 hover:bg-blue-700 text-white font-medium px-7 py-3.5 rounded-2xl shadow-sm transition whitespace-nowrap text-sm">
                 جستجو
             </button>
         </form>
+        {% if last_city %}
+            <p class="text-xs text-gray-500 mt-2">
+                شهر برگزیده شما بر اساس آخرین بازدید: <span class="font-semibold text-blue-600">{{ last_city }}</span>
+            </p>
+        {% endif %}
     </div>
 </section>
+
+<!-- Recently Viewed Items Partial -->
+{% include "partials/recent_items.html" %}
 
 <!-- How it works -->
 <section class="py-12">

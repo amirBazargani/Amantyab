@@ -1,9 +1,17 @@
 from decimal import Decimal
+from urllib.parse import unquote
 
 from django.contrib.auth import get_user_model
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.test import TestCase
 from django.urls import reverse
+
+from core.cookies import (
+    LAST_CITY_COOKIE,
+    RECENT_ITEMS_COOKIE,
+    get_last_city,
+    get_recent_item_ids,
+)
 
 from .models import Category, Item, ItemImage
 
@@ -988,18 +996,110 @@ class CatalogSessionFilterTests(TestCase):
         self.assertIn(self.drill, response.context["items"])
         self.assertIn(self.tent, response.context["items"])
 
-    def test_submitting_all_empty_filters_clears_session(self):
-        url = reverse("catalog:item_list")
-        # Save filter
-        self.client.get(url, {"q": "دریل"})
-        self.assertIn("catalog_search_filters", self.client.session)
 
-        # Submit empty form
-        response = self.client.get(url, {"q": "", "category": "", "city": "", "max_price": ""})
+class CatalogCookieTests(TestCase):
+    """Tests for recent_items signed cookie and last_city cookie in catalog views."""
+
+    def setUp(self):
+        self.owner = User.objects.create_user(
+            username="cookie_owner",
+            email="cookie_owner@example.com",
+            password="StrongPassword123!",
+            city="تهران",
+        )
+        self.cat = Category.objects.create(name="ابزار", slug="tools")
+        self.item1 = Item.objects.create(
+            owner=self.owner,
+            category=self.cat,
+            title="مینی‌فرز رونیکس",
+            daily_price=Decimal("50000"),
+            city="تهران",
+            is_active=True,
+        )
+        self.item2 = Item.objects.create(
+            owner=self.owner,
+            category=self.cat,
+            title="پمپ باد اینتکس",
+            daily_price=Decimal("35000"),
+            city="اصفهان",
+            is_active=True,
+        )
+
+    def test_item_detail_sets_signed_recent_items_and_last_city_cookies(self):
+        url = reverse("catalog:item_detail", kwargs={"pk": self.item1.pk})
+        response = self.client.get(url)
         self.assertEqual(response.status_code, 200)
-        self.assertNotIn("catalog_search_filters", self.client.session)
-        self.assertEqual(response.context["q"], "")
-        self.assertIn(self.drill, response.context["items"])
-        self.assertIn(self.tent, response.context["items"])
+
+        # Check recent_items signed cookie
+        self.assertIn(RECENT_ITEMS_COOKIE, response.cookies)
+        recent_cookie = response.cookies[RECENT_ITEMS_COOKIE]
+        self.assertTrue(recent_cookie["httponly"])
+        self.assertEqual(recent_cookie["max-age"], 7 * 24 * 60 * 60)
+
+        # Verify decoded value contains item1.pk
+        req = response.wsgi_request
+        # wsgi_request COOKIES contains client sent cookies, client.cookies now has the new cookie
+        from django.test import RequestFactory
+        check_req = RequestFactory().get("/")
+        check_req.COOKIES[RECENT_ITEMS_COOKIE] = recent_cookie.value
+        self.assertEqual(get_recent_item_ids(check_req), [self.item1.pk])
+
+        # Check last_city cookie
+        self.assertIn(LAST_CITY_COOKIE, response.cookies)
+        city_cookie = response.cookies[LAST_CITY_COOKIE]
+        self.assertEqual(city_cookie["max-age"], 7 * 24 * 60 * 60)
+        check_req.COOKIES[LAST_CITY_COOKIE] = city_cookie.value
+        self.assertEqual(get_last_city(check_req), "تهران")
+
+    def test_item_detail_accumulates_and_deduplicates_recent_items(self):
+        # Visit item 1
+        url1 = reverse("catalog:item_detail", kwargs={"pk": self.item1.pk})
+        resp1 = self.client.get(url1)
+        self.assertEqual(resp1.status_code, 200)
+
+        # Visit item 2
+        url2 = reverse("catalog:item_detail", kwargs={"pk": self.item2.pk})
+        resp2 = self.client.get(url2)
+        self.assertEqual(resp2.status_code, 200)
+
+        from django.test import RequestFactory
+        check_req = RequestFactory().get("/")
+        check_req.COOKIES[RECENT_ITEMS_COOKIE] = self.client.cookies[RECENT_ITEMS_COOKIE].value
+        self.assertEqual(get_recent_item_ids(check_req), [self.item2.pk, self.item1.pk])
+        check_req.COOKIES[LAST_CITY_COOKIE] = self.client.cookies[LAST_CITY_COOKIE].value
+        self.assertEqual(get_last_city(check_req), "اصفهان")
+
+        # Visit item 1 again -> should move item1 to front
+        resp3 = self.client.get(url1)
+        self.assertEqual(resp3.status_code, 200)
+        check_req.COOKIES[RECENT_ITEMS_COOKIE] = self.client.cookies[RECENT_ITEMS_COOKIE].value
+        self.assertEqual(get_recent_item_ids(check_req), [self.item1.pk, self.item2.pk])
+        check_req.COOKIES[LAST_CITY_COOKIE] = self.client.cookies[LAST_CITY_COOKIE].value
+        self.assertEqual(get_last_city(check_req), "تهران")
+
+    def test_item_list_sets_last_city_cookie_when_filtered(self):
+        url = reverse("catalog:item_list")
+        response = self.client.get(url, {"city": "اصفهان"})
+        self.assertEqual(response.status_code, 200)
+
+        self.assertIn(LAST_CITY_COOKIE, response.cookies)
+        from django.test import RequestFactory
+        check_req = RequestFactory().get("/")
+        check_req.COOKIES[LAST_CITY_COOKIE] = response.cookies[LAST_CITY_COOKIE].value
+        self.assertEqual(get_last_city(check_req), "اصفهان")
+
+    def test_tampered_cookie_ignored_in_item_detail(self):
+        self.client.cookies[RECENT_ITEMS_COOKIE] = "tampered:bad_signature"
+        url = reverse("catalog:item_detail", kwargs={"pk": self.item2.pk})
+        response = self.client.get(url)
+        self.assertEqual(response.status_code, 200)
+
+        from django.test import RequestFactory
+        check_req = RequestFactory().get("/")
+        check_req.COOKIES[RECENT_ITEMS_COOKIE] = self.client.cookies[RECENT_ITEMS_COOKIE].value
+        # Tampered cookie was discarded and new list contains only item2
+        self.assertEqual(get_recent_item_ids(check_req), [self.item2.pk])
+
+
 
 

@@ -1,0 +1,26 @@
+{% if recent_items %}
+<section class="my-10" id="recent-items-section">
+    <div class="flex items-center justify-between mb-6 border-b border-gray-100 pb-4">
+        <div class="flex items-center space-x-3 space-x-reverse">
+            <div class="w-9 h-9 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center border border-blue-100 shadow-sm">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                </svg>
+            </div>
+            <div>
+                <h2 class="text-xl font-bold text-gray-900">کالاهای اخیراً مشاهده‌شده</h2>
+                <p class="text-xs text-gray-500 mt-0.5">آخرین ابزارها و وسایلی که بررسی کرده‌اید</p>
+            </div>
+        </div>
+        <span class="text-xs bg-gray-100 text-gray-600 px-3 py-1 rounded-full font-medium">
+            {{ recent_items|length }} کالا
+        </span>
+    </div>
+
+    <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-3 xl:grid-cols-6 gap-4">
+        {% for item in recent_items %}
+            {% include "partials/item_card.html" with item=item %}
+        {% endfor %}
+    </div>
+</section>
+{% endif %}
