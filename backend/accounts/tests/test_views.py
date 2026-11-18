@@ -1,19 +1,19 @@
 from decimal import Decimal
 from unittest.mock import patch
 
-from django.core import mail
 from django.contrib.auth import get_user_model
+from django.core import mail
 from django.test import TestCase
 from django.urls import reverse
 
-from accounts.tokens import generate_verification_token, verify_token
+from accounts.tokens import generate_verification_token
 from catalog.models import Category, Item
 from core.models import NotificationLog
 
 User = get_user_model()
 
 
-class AccountsAuthTests(TestCase):
+class AccountsAuthViewTests(TestCase):
     def setUp(self):
         self.user = User.objects.create_user(
             username="testuser",
@@ -43,13 +43,11 @@ class AccountsAuthTests(TestCase):
             follow=True,
         )
         self.assertEqual(response.status_code, 200)
-        # Verify user is logged in
         new_user = response.context["user"]
         self.assertTrue(new_user.is_authenticated)
         self.assertEqual(new_user.username, "newuser")
         self.assertEqual(new_user.phone, "09123456789")
 
-        # Verify NotificationLog rows (1 email, 1 sms)
         logs = NotificationLog.objects.filter(user=new_user, event="signup_confirmation")
         self.assertEqual(logs.count(), 2)
         email_log = logs.get(channel="email")
@@ -81,7 +79,7 @@ class AccountsAuthTests(TestCase):
             {
                 "username": "badphoneuser",
                 "email": "badphone@example.com",
-                "phone": "08123456789",  # Does not start with 09
+                "phone": "08123456789",
                 "password1": "SecurePass1234!",
                 "password2": "SecurePass1234!",
             },
@@ -109,7 +107,6 @@ class AccountsAuthTests(TestCase):
 
     def test_signup_notification_failure_does_not_stop_signup(self):
         signup_url = reverse("accounts:signup")
-        # Simulate SMS backend failure
         with patch("core.sms.ConsoleBackend.send_sms", side_effect=RuntimeError("SMS Provider Unavailable")):
             response = self.client.post(
                 signup_url,
@@ -127,7 +124,6 @@ class AccountsAuthTests(TestCase):
         self.assertTrue(response.context["user"].is_authenticated)
         self.assertEqual(response.context["user"].username, "robustuser")
 
-        # Verify SMS log captured the failure while email succeeded
         sms_log = NotificationLog.objects.get(user=robust_user, channel="sms")
         self.assertEqual(sms_log.status, "failed")
         self.assertIn("SMS Provider Unavailable", sms_log.error)
@@ -285,9 +281,7 @@ class SessionManagementTests(TestCase):
         self.assertTrue(response.context["user"].is_authenticated)
 
         session = self.client.session
-        # Should NOT expire at browser close
         self.assertFalse(session.get_expire_at_browser_close())
-        # Age should be 2 weeks (1209600 seconds)
         self.assertEqual(session.get_expiry_age(), 1209600)
 
     def test_login_remember_me_unchecked_expires_at_browser_close(self):
@@ -297,7 +291,6 @@ class SessionManagementTests(TestCase):
             {
                 "username": "sessionuser",
                 "password": "StrongPassword123!",
-                # remember_me is omitted / unchecked
             },
             follow=True,
         )
@@ -305,7 +298,6 @@ class SessionManagementTests(TestCase):
         self.assertTrue(response.context["user"].is_authenticated)
 
         session = self.client.session
-        # Must expire at browser close
         self.assertTrue(session.get_expire_at_browser_close())
 
     def test_logout_clears_session(self):
@@ -318,7 +310,6 @@ class SessionManagementTests(TestCase):
                 "remember_me": "on",
             },
         )
-        # Store arbitrary data in session
         session = self.client.session
         session["catalog_search_filters"] = {"q": "دریل"}
         session.save()
@@ -327,7 +318,6 @@ class SessionManagementTests(TestCase):
         response = self.client.post(logout_url, follow=True)
         self.assertEqual(response.status_code, 200)
 
-        # After logout, session should be flushed
         self.assertNotIn("_auth_user_id", self.client.session)
         self.assertNotIn("catalog_search_filters", self.client.session)
 
@@ -394,7 +384,6 @@ class AccountsLoggingTests(TestCase):
 
     def test_logout_and_profile_edit_log_to_accounts(self):
         self.client.force_login(self.user)
-        # 1. Profile edit log
         with self.assertLogs("amanatyab.accounts", level="INFO") as cm:
             resp = self.client.post(
                 reverse("accounts:profile"),
@@ -414,7 +403,6 @@ class AccountsLoggingTests(TestCase):
             f"Expected profile update log in {cm.output}",
         )
 
-        # 2. Logout log
         with self.assertLogs("amanatyab.accounts", level="INFO") as cm_logout:
             resp_logout = self.client.post(reverse("accounts:logout"), follow=True)
         self.assertEqual(resp_logout.status_code, 200)
@@ -424,7 +412,7 @@ class AccountsLoggingTests(TestCase):
         )
 
 
-class EmailVerificationTests(TestCase):
+class EmailVerificationViewTests(TestCase):
     def setUp(self):
         self.user = User.objects.create_user(
             username="verifyuser",
@@ -433,24 +421,6 @@ class EmailVerificationTests(TestCase):
             phone="09123456789",
             is_email_verified=False,
         )
-
-    def test_generate_and_verify_token_success(self):
-        token = generate_verification_token(self.user)
-        user, err = verify_token(token)
-        self.assertIsNone(err)
-        self.assertEqual(user, self.user)
-
-    def test_verify_token_expired(self):
-        token = generate_verification_token(self.user)
-        user, err = verify_token(token, max_age=-1)
-        self.assertIsNone(user)
-        self.assertEqual(err, "expired")
-
-    def test_verify_token_invalid_or_tampered(self):
-        token = generate_verification_token(self.user) + "tampered"
-        user, err = verify_token(token)
-        self.assertIsNone(user)
-        self.assertEqual(err, "invalid")
 
     def test_signup_email_contains_verification_link_and_sms_is_plain(self):
         signup_url = reverse("accounts:signup")
@@ -505,12 +475,10 @@ class EmailVerificationTests(TestCase):
         self.client.force_login(self.user)
         url = reverse("accounts:resend_verification")
 
-        # GET request renders verify_sent page
         res_get = self.client.get(url)
         self.assertEqual(res_get.status_code, 200)
         self.assertTemplateUsed(res_get, "accounts/verify_sent.html")
 
-        # POST request sends verification email
         res_post = self.client.post(url)
         self.assertEqual(res_post.status_code, 200)
         self.assertEqual(len(mail.outbox), 1)
@@ -528,6 +496,3 @@ class EmailVerificationTests(TestCase):
         self.user.save()
         res_item_verified = self.client.get(reverse("catalog:item_create"))
         self.assertEqual(res_item_verified.status_code, 200)
-
-
-
