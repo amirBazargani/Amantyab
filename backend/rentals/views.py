@@ -11,6 +11,7 @@ from django.views.decorators.http import require_POST
 from django.utils.translation import gettext_lazy as _
 
 from catalog.models import Item
+from core.decorators import verified_required
 from .forms import DisputeForm, DisputeResolveForm, RentalRequestForm
 from .models import Dispute, Payment, Rental
 from .services import (
@@ -30,7 +31,7 @@ from .services import (
 logger = logging.getLogger("amanatyab.rentals")
 
 
-@login_required
+@verified_required
 def rental_request(request, item_id):
     """
     Renter requests to rent an item. Validates dates, checks overlap,

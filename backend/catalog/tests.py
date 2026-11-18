@@ -349,6 +349,7 @@ class ItemOwnerManagementTestCase(TestCase):
             last_name="رضایی",
             phone="09121112233",
             city="تهران",
+            is_email_verified=True,
         )
         self.other_user = User.objects.create_user(
             username="otherrenter",
@@ -357,6 +358,7 @@ class ItemOwnerManagementTestCase(TestCase):
             first_name="سامان",
             phone="09129998877",
             city="تهران",
+            is_email_verified=True,
         )
         self.category = Category.objects.create(name="ابزار برقی", slug="electric-tools")
 
@@ -561,6 +563,7 @@ class ItemMapLocationTestCase(TestCase):
             email="mapowner@example.com",
             password="StrongPassword123!",
             city="تهران",
+            is_email_verified=True,
         )
         self.category = Category.objects.create(name="نقشه‌برداری", slug="surveying")
 
@@ -690,6 +693,7 @@ class ItemRegistrationNotificationTestCase(TestCase):
             first_name="مهرداد",
             phone="09127778899",
             city="تهران",
+            is_email_verified=True,
         )
         self.category = Category.objects.create(name="ابزار تست اعلان", slug="notif-tools")
 
@@ -1108,12 +1112,14 @@ class CatalogLoggingTests(TestCase):
             password="Password123!",
             phone="09123334455",
             email="owner@example.com",
+            is_email_verified=True,
         )
         self.other_user = User.objects.create_user(
             username="cat_other",
             password="Password123!",
             phone="09124445566",
             email="other@example.com",
+            is_email_verified=True,
         )
         self.category = Category.objects.create(name="ابزار برقی", slug="tools")
         self.item = Item.objects.create(

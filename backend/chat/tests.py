@@ -106,12 +106,14 @@ class ChatViewsTestCase(TestCase):
             email="vw_owner@chat.test",
             password="Password123!",
             phone="09121111140",
+            is_email_verified=True,
         )
         self.renter = User.objects.create_user(
             username="vw_chat_renter",
             email="vw_renter@chat.test",
             password="Password123!",
             phone="09122222241",
+            is_email_verified=True,
         )
         self.stranger = User.objects.create_user(
             username="vw_chat_stranger",
@@ -222,12 +224,14 @@ class ChatLoggingTests(TestCase):
             password="Password123!",
             phone="09121118800",
             email="co@example.com",
+            is_email_verified=True,
         )
         self.renter = User.objects.create_user(
             username="chat_log_renter",
             password="Password123!",
             phone="09122229911",
             email="cr@example.com",
+            is_email_verified=True,
         )
         self.third_party = User.objects.create_user(
             username="chat_log_third",
