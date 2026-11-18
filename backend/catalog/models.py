@@ -1,8 +1,11 @@
 from decimal import Decimal, InvalidOperation
+from io import BytesIO
 
+from PIL import Image as PILImage
 from django.apps import apps
 from django.conf import settings
 from django.core.exceptions import ValidationError
+from django.core.files.base import ContentFile
 from django.core.validators import MaxValueValidator, MinValueValidator
 from django.db import models
 from django.utils.translation import gettext_lazy as _
@@ -225,6 +228,20 @@ class Item(models.Model):
                 _("Latitude and longitude must either both be set or both be empty.")
             )
 
+    @property
+    def primary_image(self):
+        """
+        Return the primary image of the item.
+        Uses in-memory prefetched images cache if available to prevent N+1 queries.
+        """
+        if hasattr(self, "_prefetched_objects_cache") and "images" in self._prefetched_objects_cache:
+            for img in self.images.all():
+                if img.is_primary:
+                    return img
+            images = list(self.images.all())
+            return images[0] if images else None
+        return self.images.filter(is_primary=True).first() or self.images.first()
+
 
 class ItemImage(models.Model):
     item = models.ForeignKey(
@@ -245,3 +262,35 @@ class ItemImage(models.Model):
 
     def __str__(self):
         return f"{self.item.title} image ({self.id})"
+
+    def save(self, *args, **kwargs):
+        """
+        Save item image. If a new image file is uploaded and exceeds 1200px,
+        resize proportionally and compress using Pillow before saving.
+        """
+        if self.image and not getattr(self.image, "_committed", True):
+            self._resize_image()
+        super().save(*args, **kwargs)
+
+    def _resize_image(self):
+        """Proportionally resize image so neither width nor height exceeds 1200px."""
+        try:
+            self.image.open()
+            with PILImage.open(self.image) as img:
+                width, height = img.size
+                max_dimension = 1200
+                if width > max_dimension or height > max_dimension:
+                    img = img.copy()
+                    img.thumbnail((max_dimension, max_dimension), PILImage.Resampling.LANCZOS)
+                    img_format = img.format or "JPEG"
+                    buffer = BytesIO()
+                    if img_format.upper() in ("JPEG", "JPG"):
+                        if img.mode in ("RGBA", "P", "LA"):
+                            img = img.convert("RGB")
+                        img.save(buffer, format="JPEG", quality=85, optimize=True)
+                    else:
+                        img.save(buffer, format=img_format, optimize=True)
+                    buffer.seek(0)
+                    self.image.save(self.image.name, ContentFile(buffer.getvalue()), save=False)
+        except Exception:
+            pass

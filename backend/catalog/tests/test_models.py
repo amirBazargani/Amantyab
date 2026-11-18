@@ -1,11 +1,14 @@
 from decimal import Decimal
+from io import BytesIO
 
+from PIL import Image as PILImage
 from django.contrib.auth import get_user_model
 from django.core.exceptions import ValidationError
+from django.core.files.uploadedfile import SimpleUploadedFile
 from django.db import IntegrityError
 from django.test import TestCase
 
-from catalog.models import Category, Item
+from catalog.models import Category, Item, ItemImage
 
 User = get_user_model()
 
@@ -202,3 +205,78 @@ class ItemModelConstraintTestCase(TestCase):
         )
         self.assertEqual(str(self.category), "ابزار ساختمانی")
         self.assertEqual(subcat.parent, self.category)
+
+
+class ItemImageResizingTestCase(TestCase):
+    def setUp(self):
+        self.owner = User.objects.create_user(
+            username="imguser",
+            email="img@example.com",
+            password="StrongPassword123!",
+        )
+        self.category = Category.objects.create(name="ابزار تست", slug="tools-img")
+        self.item = Item.objects.create(
+            owner=self.owner,
+            category=self.category,
+            title="کالای تست تصویر",
+            description="توضیحات",
+            daily_price=Decimal("50000"),
+            city="تهران",
+        )
+
+    def _create_uploaded_image(self, width, height, name="test.jpg"):
+        im = PILImage.new("RGB", (width, height), color="blue")
+        buf = BytesIO()
+        im.save(buf, format="JPEG")
+        return SimpleUploadedFile(name, buf.getvalue(), content_type="image/jpeg")
+
+    def test_large_image_resized_to_max_1200px(self):
+        """Image larger than 1200px on longest side is resized proportionally on save."""
+        uploaded = self._create_uploaded_image(2000, 1000, "large.jpg")
+        img_obj = ItemImage.objects.create(item=self.item, image=uploaded, is_primary=True)
+
+        with PILImage.open(img_obj.image.path) as img:
+            w, h = img.size
+            self.assertEqual(w, 1200)
+            self.assertEqual(h, 600)
+
+        img_obj.image.delete(save=False)
+
+    def test_small_image_not_enlarged(self):
+        """Image with dimensions <= 1200px is not resized/enlarged."""
+        uploaded = self._create_uploaded_image(800, 600, "small.jpg")
+        img_obj = ItemImage.objects.create(item=self.item, image=uploaded)
+
+        with PILImage.open(img_obj.image.path) as img:
+            w, h = img.size
+            self.assertEqual(w, 800)
+            self.assertEqual(h, 600)
+
+        img_obj.image.delete(save=False)
+
+    def test_primary_image_property_prefetched_and_unprefetched(self):
+        """Item.primary_image returns primary image correctly both with and without prefetch."""
+        img1 = ItemImage.objects.create(
+            item=self.item,
+            image=self._create_uploaded_image(200, 200, "1.jpg"),
+            is_primary=False,
+            order=1,
+        )
+        img2 = ItemImage.objects.create(
+            item=self.item,
+            image=self._create_uploaded_image(200, 200, "2.jpg"),
+            is_primary=True,
+            order=2,
+        )
+
+        # Unprefetched
+        item_fresh = Item.objects.get(pk=self.item.pk)
+        self.assertEqual(item_fresh.primary_image.pk, img2.pk)
+
+        # Prefetched
+        item_prefetched = Item.objects.prefetch_related("images").get(pk=self.item.pk)
+        with self.assertNumQueries(0):
+            self.assertEqual(item_prefetched.primary_image.pk, img2.pk)
+
+        img1.image.delete(save=False)
+        img2.image.delete(save=False)

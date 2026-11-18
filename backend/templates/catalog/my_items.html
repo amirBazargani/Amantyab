@@ -46,7 +46,7 @@
                     <div>
                         <!-- Image & Status Badges -->
                         <div class="h-48 bg-gray-100 relative">
-                            {% with item.images.first as primary_img %}
+                            {% with item.primary_image as primary_img %}
                                 {% if primary_img and primary_img.image %}
                                     <img src="{{ primary_img.image.url }}" alt="{{ item.title }}" class="w-full h-full object-cover">
                                 {% else %}
@@ -205,26 +205,8 @@
             {% endfor %}
         </div>
     {% else %}
-        <!-- Empty State -->
-        <div class="bg-white rounded-2xl border border-gray-200 p-12 text-center max-w-xl mx-auto space-y-4">
-            <div class="w-16 h-16 bg-blue-50 text-blue-600 rounded-full flex items-center justify-center mx-auto">
-                <svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M12 6v6m0 0v6m0-6h6m-6 0H6"></path>
-                </svg>
-            </div>
-            <h2 class="text-xl font-bold text-gray-900">شما هنوز هیچ کالایی ثبت نکرده‌اید!</h2>
-            <p class="text-sm text-gray-500 max-w-sm mx-auto leading-relaxed">
-                ابزارها و وسایلی که در خانه یا کارگاه بلااستفاده مانده‌اند را ثبت کنید تا همسایگانتان بتوانند آنها را به امانت بگیرند و شما نیز درآمد کسب کنید.
-            </p>
-            <div class="pt-2">
-                <a href="{% url 'catalog:item_create' %}" class="inline-flex items-center space-x-2 space-x-reverse bg-blue-600 hover:bg-blue-700 text-white font-medium px-5 py-2.5 rounded-xl text-sm shadow-sm transition">
-                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path>
-                    </svg>
-                    <span>ثبت اولین کالا</span>
-                </a>
-            </div>
-        </div>
+        {% url 'catalog:item_create' as item_create_url %}
+        {% include "partials/empty_state.html" with icon="box" title="شما هنوز هیچ کالایی ثبت نکرده‌اید!" message="ابزارها و وسایلی که در خانه یا کارگاه بلااستفاده مانده‌اند را ثبت کنید تا همسایگانتان بتوانند آنها را به امانت بگیرند و شما نیز درآمد کسب کنید." action_url=item_create_url action_text="ثبت اولین کالا" %}
     {% endif %}
 </div>
 {% endblock %}

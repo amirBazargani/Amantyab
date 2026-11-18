@@ -181,16 +181,19 @@ def my_rentals(request):
     List of rentals requested by the logged-in user as renter.
     Optional filter by status query param using RentalQuerySet.
     """
-    rentals = Rental.objects.for_renter(request.user).select_related(
-        "item", "item__owner"
-    ).order_by("-created_at")
+    rentals = (
+        Rental.objects.for_renter(request.user)
+        .select_related("item", "item__owner")
+        .prefetch_related("item__images")
+        .order_by("-created_at")
+    )
 
     selected_status = request.GET.get("status", "").strip()
     if selected_status and selected_status in Rental.Status.values:
         rentals = rentals.with_status(selected_status)
 
     context = {
-        "rentals": rentals,
+        "rentals": list(rentals),
         "selected_status": selected_status,
         "status_choices": Rental.Status.choices,
     }
@@ -203,16 +206,19 @@ def owner_rentals(request):
     List of rental requests for items owned by the logged-in user.
     Optional filter by status query param using RentalQuerySet.
     """
-    rentals = Rental.objects.for_owner(request.user).select_related(
-        "item", "renter"
-    ).order_by("-created_at")
+    rentals = (
+        Rental.objects.for_owner(request.user)
+        .select_related("item", "renter")
+        .prefetch_related("item__images")
+        .order_by("-created_at")
+    )
 
     selected_status = request.GET.get("status", "").strip()
     if selected_status and selected_status in Rental.Status.values:
         rentals = rentals.with_status(selected_status)
 
     context = {
-        "rentals": rentals,
+        "rentals": list(rentals),
         "selected_status": selected_status,
         "status_choices": Rental.Status.choices,
     }
@@ -458,14 +464,24 @@ def admin_dashboard(request):
 
     User = get_user_model()
     users_count = User.objects.count()
-    items_count = Item.objects.count()
-    active_items_count = Item.objects.active().count()
-    total_rentals = Rental.objects.count()
 
+    item_stats = Item.objects.aggregate(
+        total=Count("id"),
+        active=Count("id", filter=Q(is_active=True)),
+    )
+    items_count = item_stats["total"]
+    active_items_count = item_stats["active"]
+
+    status_counts = dict(
+        Rental.objects.values("status")
+        .annotate(count=Count("id"))
+        .values_list("status", "count")
+    )
     rentals_by_status = {
-        status: Rental.objects.with_status(status).count()
+        status: status_counts.get(status, 0)
         for status, _ in Rental.Status.choices
     }
+    total_rentals = sum(status_counts.values())
 
     # Total commission from completed rentals
     total_commission = (
@@ -475,12 +491,21 @@ def admin_dashboard(request):
         or Decimal("0")
     )
 
-    open_disputes_count = Dispute.objects.filter(status=Dispute.Status.OPEN).count()
-    resolved_disputes_count = Dispute.objects.filter(status=Dispute.Status.RESOLVED).count()
-    total_disputes_count = Dispute.objects.count()
+    dispute_stats = Dispute.objects.aggregate(
+        total=Count("id"),
+        open=Count("id", filter=Q(status=Dispute.Status.OPEN)),
+        resolved=Count("id", filter=Q(status=Dispute.Status.RESOLVED)),
+    )
+    open_disputes_count = dispute_stats["open"]
+    resolved_disputes_count = dispute_stats["resolved"]
+    total_disputes_count = dispute_stats["total"]
 
-    recent_rentals = Rental.objects.select_related("item", "renter").order_by("-created_at")[:6]
-    recent_disputes = Dispute.objects.select_related("rental", "opened_by").order_by("-created_at")[:6]
+    recent_rentals = list(
+        Rental.objects.select_related("item", "renter").order_by("-created_at")[:6]
+    )
+    recent_disputes = list(
+        Dispute.objects.select_related("rental", "opened_by").order_by("-created_at")[:6]
+    )
 
     context = {
         "users_count": users_count,

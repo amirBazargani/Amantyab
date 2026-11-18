@@ -74,16 +74,7 @@
                 </div>
             {% endif %}
 
-            <div class="space-y-1.5">
-                <label for="{{ form.reason.id_for_label }}" class="block text-xs font-bold text-gray-700">
-                    {{ form.reason.label }} <span class="text-red-500">*</span>
-                </label>
-                {{ form.reason }}
-                {% if form.reason.errors %}
-                    <p class="text-xs text-red-600 mt-1 font-medium">{{ form.reason.errors.0 }}</p>
-                {% endif %}
-                <p class="text-[11px] text-gray-400">حداقل ۱۰ کاراکتر. دلایل، شواهد و جزییات خسارت یا تخلف را به طور کامل تشریح نمایید.</p>
-            </div>
+            {% include "partials/form_field.html" with field=form.reason help_text="حداقل ۱۰ کاراکتر. دلایل، شواهد و جزییات خسارت یا تخلف را به طور کامل تشریح نمایید." %}
 
             <!-- Actions -->
             <div class="flex items-center justify-end gap-3 pt-4 border-t border-gray-100">

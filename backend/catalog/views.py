@@ -68,6 +68,7 @@ def item_list(request):
         .prefetch_related("images")
     )
 
+    items = list(queryset)
     categories = Category.objects.all().order_by("name")
     cities = (
         Item.objects.active()
@@ -77,14 +78,14 @@ def item_list(request):
     )
 
     context = {
-        "items": queryset,
+        "items": items,
         "categories": categories,
         "cities": cities,
         "q": q,
         "selected_category": category_param,
         "selected_city": city,
         "max_price": max_price_param,
-        "total_count": queryset.count(),
+        "total_count": len(items),
     }
     response = render(request, "catalog/item_list.html", context)
     if city:

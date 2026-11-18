@@ -11,7 +11,7 @@ from django.test import Client, TestCase
 from django.urls import reverse
 from django.utils import timezone
 
-from catalog.models import Category, Item
+from catalog.models import Category, Item, ItemImage
 from core.models import NotificationLog
 from rentals.forms import DisputeForm, DisputeResolveForm, RentalRequestForm
 from rentals.models import Dispute, Payment, Rental
@@ -156,6 +156,38 @@ class RentalViewsTestCase(TestCase):
         self.client.force_login(self.renter)
         resp = self.client.get(receipt_url)
         self.assertEqual(resp.status_code, 200)
+
+    def test_my_rentals_query_count_constant(self):
+        """
+        Verify that my_rentals view executes constant number of queries
+        with no N+1 query problem when listing multiple rentals with images.
+        """
+        self.client.force_login(self.renter)
+        now = timezone.now()
+        for i in range(8):
+            item = Item.objects.create(
+                owner=self.owner,
+                category=self.category,
+                title=f"کالای آزمایشی سفارش {i}",
+                daily_price=Decimal("50000"),
+                city="تهران",
+                is_active=True,
+            )
+            ItemImage.objects.create(item=item, image="items/test.jpg", is_primary=True)
+            Rental.objects.create(
+                renter=self.renter,
+                item=item,
+                start_at=now + timedelta(days=i + 1),
+                end_at=now + timedelta(days=i + 2),
+                rent_amount=Decimal("50000"),
+                deposit_amount=Decimal("100000"),
+                status=Rental.Status.CONFIRMED,
+            )
+
+        with self.assertNumQueries(4):
+            resp = self.client.get(reverse("rentals:my_rentals"))
+            self.assertEqual(resp.status_code, 200)
+            self.assertGreaterEqual(len(resp.context["rentals"]), 8)
 
 
 
@@ -660,6 +692,20 @@ class RentalDisputesAndAdminDashboardTestCase(TestCase):
         self.assertEqual(context["rentals_by_status"]["completed"], 1)
         self.assertEqual(context["rentals_by_status"]["handed_over"], 1)
         self.assertEqual(context["total_commission"], completed_rental.commission_amount)
+
+    def test_admin_dashboard_query_count_constant(self):
+        """
+        Verify that admin dashboard aggregates metrics efficiently without N+1 queries.
+        """
+        client = Client()
+        client.force_login(self.staff_admin)
+        for st in [Rental.Status.CONFIRMED, Rental.Status.HANDED_OVER, Rental.Status.COMPLETED]:
+            self._create_rental_in_status(st)
+
+        # 9 queries: session, user, users_count, item_stats, status_counts, total_commission, dispute_stats, recent_rentals, recent_disputes
+        with self.assertNumQueries(9):
+            resp = client.get(reverse("rentals:admin_dashboard"))
+            self.assertEqual(resp.status_code, 200)
 
 
 
