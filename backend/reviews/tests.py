@@ -451,3 +451,96 @@ class ReviewQuerySetTests(TestCase):
         # User with no reviews
         other_avg = Review.objects.for_user(self.other_user).average_rating()
         self.assertIsNone(other_avg)
+
+
+class ReviewsLoggingTests(TestCase):
+    def setUp(self):
+        self.owner = User.objects.create_user(
+            username="rev_log_owner",
+            password="Password123!",
+            phone="09121115599",
+            email="revo@example.com",
+        )
+        self.renter = User.objects.create_user(
+            username="rev_log_renter",
+            password="Password123!",
+            phone="09122226600",
+            email="revr@example.com",
+        )
+        self.third_party = User.objects.create_user(
+            username="rev_log_third",
+            password="Password123!",
+            phone="09123337711",
+            email="revt@example.com",
+        )
+        self.category = Category.objects.create(name="لوازم سفر", slug="travel")
+        self.item = Item.objects.create(
+            owner=self.owner,
+            category=self.category,
+            title="کوله پشتی کوهنوردی",
+            daily_price=Decimal("50000"),
+            deposit_amount=Decimal("200000"),
+            city="تهران",
+            allow_pickup=True,
+            is_active=True,
+        )
+        now = timezone.now()
+        self.rental = Rental.objects.create(
+            item=self.item,
+            renter=self.renter,
+            start_at=now - timedelta(days=3),
+            end_at=now - timedelta(days=1),
+            delivery_method=Rental.DeliveryMethod.PICKUP,
+            status=Rental.Status.COMPLETED,
+            rent_amount=Decimal("100000"),
+            deposit_amount=Decimal("200000"),
+            commission_rate=Decimal("0.15"),
+            commission_amount=Decimal("15000"),
+            owner_payout=Decimal("85000"),
+        )
+
+    def test_review_create_logging(self):
+        self.client.force_login(self.renter)
+        url = reverse("reviews:review_create", kwargs={"rental_pk": self.rental.pk})
+        data = {
+            "rating": 5,
+            "comment": "کوله بسیار تمیز و باکیفیت بود",
+        }
+        with self.assertLogs("amanatyab.reviews", level="INFO") as cm:
+            resp = self.client.post(url, data, follow=True)
+        self.assertEqual(resp.status_code, 200)
+        self.assertTrue(
+            any("Review created: review_id=" in msg and "rating=5" in msg for msg in cm.output),
+            f"Expected review create log in {cm.output}",
+        )
+
+    def test_permission_denied_warning_logging(self):
+        self.client.force_login(self.third_party)
+        url = reverse("reviews:review_create", kwargs={"rental_pk": self.rental.pk})
+        with self.assertLogs("amanatyab.reviews", level="WARNING") as cm:
+            resp = self.client.get(url)
+        self.assertEqual(resp.status_code, 403)
+        self.assertTrue(
+            any("Permission denied on review create" in msg for msg in cm.output),
+            f"Expected permission warning log in {cm.output}",
+        )
+
+    def test_duplicate_review_warning_logging(self):
+        Review.objects.create(
+            rental=self.rental,
+            reviewer=self.renter,
+            reviewee=self.owner,
+            reviewee_role=Review.Role.OWNER,
+            rating=4,
+            comment="خوب بود",
+        )
+        self.client.force_login(self.renter)
+        url = reverse("reviews:review_create", kwargs={"rental_pk": self.rental.pk})
+        with self.assertLogs("amanatyab.reviews", level="WARNING") as cm:
+            resp = self.client.get(url, follow=True)
+        self.assertEqual(resp.status_code, 200)
+        self.assertTrue(
+            any("Duplicate review attempt" in msg for msg in cm.output),
+            f"Expected duplicate review warning log in {cm.output}",
+        )
+

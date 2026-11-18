@@ -1,3 +1,5 @@
+import logging
+
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.core.exceptions import PermissionDenied, ValidationError
@@ -7,6 +9,8 @@ from django.utils.translation import gettext_lazy as _
 from rentals.models import Rental
 from .forms import ReviewForm
 from .models import Review
+
+logger = logging.getLogger("amanatyab.reviews")
 
 
 @login_required
@@ -25,9 +29,20 @@ def review_create(request, rental_pk):
     is_owner = request.user == rental.item.owner
 
     if not is_renter and not is_owner:
+        logger.warning(
+            "Permission denied on review create: rental_id=%s user_id=%s",
+            rental.pk,
+            request.user.pk,
+        )
         raise PermissionDenied(_("شما اجازه دسترسی به این سفارش را ندارید."))
 
     if rental.status != Rental.Status.COMPLETED:
+        logger.warning(
+            "Review creation attempted on incomplete rental: rental_id=%s status=%s user_id=%s",
+            rental.pk,
+            rental.status,
+            request.user.pk,
+        )
         messages.error(
             request,
             _("تنها پس از پایان و تکمیل فرایند امانت امکان ثبت نظر و امتیاز وجود دارد."),
@@ -35,6 +50,11 @@ def review_create(request, rental_pk):
         return redirect("rentals:rental_detail", pk=rental.pk)
 
     if Review.objects.filter(rental=rental, reviewer=request.user).exists():
+        logger.warning(
+            "Duplicate review attempt: rental_id=%s user_id=%s",
+            rental.pk,
+            request.user.pk,
+        )
         messages.warning(
             request,
             _("شما قبلاً نظر و امتیاز خود را برای این سفارش ثبت کرده‌اید."),
@@ -59,6 +79,15 @@ def review_create(request, rental_pk):
             try:
                 review.full_clean()
                 review.save()
+                logger.info(
+                    "Review created: review_id=%s rental_id=%s reviewer_id=%s reviewee_id=%s rating=%s role=%s",
+                    review.pk,
+                    rental.pk,
+                    request.user.pk,
+                    reviewee.pk,
+                    review.rating,
+                    reviewee_role,
+                )
                 messages.success(request, _("نظر و امتیاز شما با موفقیت ثبت شد."))
                 return redirect("rentals:rental_detail", pk=rental.pk)
             except ValidationError as err:
