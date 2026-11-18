@@ -1,3 +1,4 @@
+import logging
 from decimal import Decimal
 
 from django.contrib import messages
@@ -26,6 +27,8 @@ from .services import (
     simulate_payment,
 )
 
+logger = logging.getLogger("amanatyab.rentals")
+
 
 @login_required
 def rental_request(request, item_id):
@@ -37,6 +40,11 @@ def rental_request(request, item_id):
 
     # Item owner cannot rent their own item
     if item.owner_id == request.user.pk:
+        logger.warning(
+            "Owner attempted to rent own item: item_id=%s user_id=%s",
+            item.pk,
+            request.user.pk,
+        )
         messages.error(
             request,
             _("شما مالک این کالا هستید و نمی‌توانید برای آن درخواست امانت ثبت کنید."),
@@ -64,6 +72,12 @@ def rental_request(request, item_id):
                 return redirect("rentals:rental_pay", pk=rental.pk)
             except ValidationError as e:
                 form.add_error(None, e.messages[0] if hasattr(e, "messages") else str(e))
+        else:
+            logger.warning(
+                "Rental request form invalid: item_id=%s user_id=%s",
+                item.pk,
+                request.user.pk,
+            )
     else:
         form = RentalRequestForm(item=item, user=request.user)
 
@@ -108,6 +122,11 @@ def rental_pay(request, pk):
         except ValidationError as e:
             messages.error(request, str(e))
         except Exception as e:
+            logger.exception(
+                "Unexpected error in simulated payment: rental_id=%s user_id=%s",
+                rental.pk,
+                request.user.pk,
+            )
             messages.error(
                 request,
                 _("خطایی در شبیه‌سازی پرداخت رخ داد: ") + str(e),
@@ -134,6 +153,11 @@ def rental_receipt(request, pk):
 
     # Only renter, owner, or staff can see receipt
     if request.user.pk not in (rental.renter_id, rental.item.owner_id) and not request.user.is_staff:
+        logger.warning(
+            "Permission denied on rental receipt: rental_id=%s user_id=%s",
+            rental.pk,
+            request.user.pk,
+        )
         raise PermissionDenied(_("شما دسترسی به فاکتور این سفارش را ندارید."))
 
     payments = rental.payments.order_by("created_at")
@@ -207,6 +231,11 @@ def rental_detail(request, pk):
     )
 
     if request.user.pk not in (rental.renter_id, rental.item.owner_id) and not request.user.is_staff:
+        logger.warning(
+            "Permission denied on rental detail: rental_id=%s user_id=%s",
+            rental.pk,
+            request.user.pk,
+        )
         raise PermissionDenied(_("شما دسترسی به این سفارش را ندارید."))
 
     payments = rental.payments.order_by("created_at")
@@ -263,6 +292,12 @@ def handover(request, pk):
     except ValidationError as e:
         messages.error(request, e.messages[0] if hasattr(e, "messages") else str(e))
     except PermissionDenied as e:
+        logger.warning(
+            "Permission denied on handover: rental_id=%s user_id=%s error=%s",
+            rental.pk,
+            request.user.pk,
+            str(e),
+        )
         messages.error(request, str(e))
 
     return redirect("rentals:rental_detail", pk=rental.pk)
@@ -285,6 +320,12 @@ def mark_returned(request, pk):
     except ValidationError as e:
         messages.error(request, e.messages[0] if hasattr(e, "messages") else str(e))
     except PermissionDenied as e:
+        logger.warning(
+            "Permission denied on mark_returned: rental_id=%s user_id=%s error=%s",
+            rental.pk,
+            request.user.pk,
+            str(e),
+        )
         messages.error(request, str(e))
 
     return redirect("rentals:rental_detail", pk=rental.pk)
@@ -307,6 +348,12 @@ def confirm_return(request, pk):
     except ValidationError as e:
         messages.error(request, e.messages[0] if hasattr(e, "messages") else str(e))
     except PermissionDenied as e:
+        logger.warning(
+            "Permission denied on confirm_return: rental_id=%s user_id=%s error=%s",
+            rental.pk,
+            request.user.pk,
+            str(e),
+        )
         messages.error(request, str(e))
 
     return redirect("rentals:rental_detail", pk=rental.pk)
@@ -328,6 +375,12 @@ def cancel(request, pk):
     except ValidationError as e:
         messages.error(request, e.messages[0] if hasattr(e, "messages") else str(e))
     except PermissionDenied as e:
+        logger.warning(
+            "Permission denied on cancel: rental_id=%s user_id=%s error=%s",
+            rental.pk,
+            request.user.pk,
+            str(e),
+        )
         messages.error(request, str(e))
 
     return redirect("rentals:rental_detail", pk=rental.pk)
@@ -345,6 +398,11 @@ def dispute_open(request, pk):
     )
 
     if request.user.pk not in (rental.renter_id, rental.item.owner_id) and not request.user.is_staff:
+        logger.warning(
+            "Permission denied on dispute open: rental_id=%s user_id=%s",
+            rental.pk,
+            request.user.pk,
+        )
         raise PermissionDenied(_("شما مجاز به ثبت اختلاف برای این سفارش نمی‌باشید."))
 
     if rental.status not in (Rental.Status.HANDED_OVER, Rental.Status.RETURNED):
@@ -391,6 +449,10 @@ def admin_dashboard(request):
     users, items, rentals by status, total commission, and disputes.
     """
     if not request.user.is_staff:
+        logger.warning(
+            "Permission denied on admin dashboard: user_id=%s",
+            request.user.pk,
+        )
         raise PermissionDenied(_("تنها مدیران سامانه مجاز به دسترسی به این بخش می‌باشند."))
 
     User = get_user_model()
@@ -442,6 +504,10 @@ def admin_dispute_list(request):
     Staff-only view to list and filter all disputes.
     """
     if not request.user.is_staff:
+        logger.warning(
+            "Permission denied on admin dispute list: user_id=%s",
+            request.user.pk,
+        )
         raise PermissionDenied(_("تنها مدیران سامانه مجاز به دسترسی به این بخش می‌باشند."))
 
     status_filter = request.GET.get("status", "").strip()
@@ -478,6 +544,11 @@ def admin_dispute_resolve(request, pk):
     Creates matching payment rows and completes the rental.
     """
     if not request.user.is_staff:
+        logger.warning(
+            "Permission denied on admin dispute resolve: dispute_id=%s user_id=%s",
+            pk,
+            request.user.pk,
+        )
         raise PermissionDenied(_("تنها مدیران سامانه مجاز به دسترسی به این بخش می‌باشند."))
 
     dispute = get_object_or_404(

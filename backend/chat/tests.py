@@ -213,3 +213,96 @@ class ChatViewsTestCase(TestCase):
         msgs = list(self.conversation.messages.all())
         self.assertEqual(msgs[0].body, "سلام، فردا تحویل حضوری دارید؟")
         self.assertEqual(msgs[1].body, "سلام، بله از ساعت ۱۰ صبح در خدمتتون هستم.")
+
+
+class ChatLoggingTests(TestCase):
+    def setUp(self):
+        self.owner = User.objects.create_user(
+            username="chat_log_owner",
+            password="Password123!",
+            phone="09121118800",
+            email="co@example.com",
+        )
+        self.renter = User.objects.create_user(
+            username="chat_log_renter",
+            password="Password123!",
+            phone="09122229911",
+            email="cr@example.com",
+        )
+        self.third_party = User.objects.create_user(
+            username="chat_log_third",
+            password="Password123!",
+            phone="09123330022",
+            email="ct@example.com",
+        )
+        self.category = Category.objects.create(name="عکاسی", slug="photo")
+        self.item = Item.objects.create(
+            owner=self.owner,
+            category=self.category,
+            title="دوربین عکاسی سونی",
+            daily_price=Decimal("150000"),
+            deposit_amount=Decimal("1000000"),
+            city="تهران",
+            allow_pickup=True,
+            is_active=True,
+        )
+        self.conversation = Conversation.objects.create(
+            item=self.item,
+            renter=self.renter,
+        )
+
+    def test_message_send_logs_without_message_body(self):
+        self.client.force_login(self.renter)
+        url = reverse("chat:conversation_detail", kwargs={"pk": self.conversation.pk})
+        secret_text = "این متن محرمانه است و هرگز نباید در لاگ ظاهر شود"
+        data = {"body": secret_text}
+
+        with self.assertLogs("amanatyab.chat", level="INFO") as cm:
+            resp = self.client.post(url, data, follow=True)
+        self.assertEqual(resp.status_code, 200)
+
+        # Ensure "Message sent: ..." is logged
+        self.assertTrue(
+            any("Message sent: message_id=" in msg for msg in cm.output),
+            f"Expected message sent log in {cm.output}",
+        )
+        # Ensure secret_text is NEVER in any log line
+        for log_line in cm.output:
+            self.assertNotIn(
+                secret_text,
+                log_line,
+                "Message body MUST NOT be logged!",
+            )
+
+    def test_conversation_opened_logging(self):
+        self.client.force_login(self.renter)
+        item2 = Item.objects.create(
+            owner=self.owner,
+            category=self.category,
+            title="لنز تله سونی",
+            daily_price=Decimal("80000"),
+            deposit_amount=Decimal("500000"),
+            city="تهران",
+            allow_pickup=True,
+            is_active=True,
+        )
+        url = reverse("chat:start_conversation", kwargs={"item_pk": item2.pk})
+        with self.assertLogs("amanatyab.chat", level="INFO") as cm:
+            resp = self.client.get(url)
+        self.assertEqual(resp.status_code, 302)
+        self.assertTrue(
+            any("Conversation opened: conversation_id=" in msg for msg in cm.output),
+            f"Expected conversation opened log in {cm.output}",
+        )
+
+    def test_permission_denied_warning_logging(self):
+        self.client.force_login(self.third_party)
+        url = reverse("chat:conversation_detail", kwargs={"pk": self.conversation.pk})
+        with self.assertLogs("amanatyab.chat", level="WARNING") as cm:
+            resp = self.client.get(url)
+        self.assertEqual(resp.status_code, 403)
+        self.assertTrue(
+            any("Permission denied on chat conversation" in msg for msg in cm.output),
+            f"Expected permission warning in {cm.output}",
+        )
+

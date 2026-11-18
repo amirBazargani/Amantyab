@@ -1,3 +1,4 @@
+import logging
 from decimal import Decimal, InvalidOperation
 
 from django.contrib import messages
@@ -15,6 +16,8 @@ from reviews.models import Review
 
 from .forms import ItemForm, ItemImageFormSet
 from .models import Category, Item
+
+logger = logging.getLogger("amanatyab.catalog")
 
 
 def item_list(request):
@@ -212,6 +215,13 @@ def item_create(request):
             # Notify owner upon registration of a new item (email + SMS)
             notify(request.user, "item_registered", {"title": item.title}, item=item)
 
+            logger.info(
+                "Item created: item_id=%s title=%s owner_id=%s",
+                item.pk,
+                item.title,
+                request.user.pk,
+            )
+
             messages.success(request, f"کالای «{item.title}» با موفقیت ثبت شد.")
             return redirect("catalog:item_detail", pk=item.pk)
     else:
@@ -235,6 +245,12 @@ def item_edit(request, pk):
     """
     item = get_object_or_404(Item, pk=pk)
     if item.owner != request.user:
+        logger.warning(
+            "Permission denied on item edit: item_id=%s user_id=%s owner_id=%s",
+            item.pk,
+            request.user.pk,
+            item.owner_id,
+        )
         raise PermissionDenied("شما اجازه ویرایش این کالا را ندارید.")
 
     if request.method == "POST":
@@ -250,6 +266,12 @@ def item_edit(request, pk):
                 images[0].is_primary = True
                 images[0].save(update_fields=["is_primary"])
 
+            logger.info(
+                "Item edited: item_id=%s title=%s user_id=%s",
+                item.pk,
+                item.title,
+                request.user.pk,
+            )
             messages.success(request, f"تغییرات کالای «{item.title}» با موفقیت ذخیره شد.")
             return redirect("catalog:item_detail", pk=item.pk)
     else:
@@ -275,10 +297,23 @@ def item_toggle_active(request, pk):
     """
     item = get_object_or_404(Item, pk=pk)
     if item.owner != request.user:
+        logger.warning(
+            "Permission denied on item toggle: item_id=%s user_id=%s owner_id=%s",
+            item.pk,
+            request.user.pk,
+            item.owner_id,
+        )
         raise PermissionDenied("شما اجازه تغییر وضعیت این کالا را ندارید.")
 
     item.is_active = not item.is_active
     item.save(update_fields=["is_active", "updated_at"])
+
+    logger.info(
+        "Item active status toggled: item_id=%s is_active=%s user_id=%s",
+        item.pk,
+        item.is_active,
+        request.user.pk,
+    )
 
     status_label = (
         "فعال شد و در کاتالوگ عمومی نمایش داده می‌شود"
@@ -302,10 +337,21 @@ def item_delete(request, pk):
     """
     item = get_object_or_404(Item, pk=pk)
     if item.owner != request.user:
+        logger.warning(
+            "Permission denied on item delete: item_id=%s user_id=%s owner_id=%s",
+            item.pk,
+            request.user.pk,
+            item.owner_id,
+        )
         raise PermissionDenied("شما اجازه حذف این کالا را ندارید.")
 
     # Acceptance: item with rentals cannot be deleted (show message, suggest pause)
     if item.rentals.exists():
+        logger.warning(
+            "Item deletion blocked due to existing rentals: item_id=%s user_id=%s",
+            item.pk,
+            request.user.pk,
+        )
         messages.warning(
             request,
             f"کالای «{item.title}» دارای سابقه یا قرارداد اجاره است و به منظور حفظ شفافیت و سوابق امانت‌داری قابل حذف نیست. می‌توانید به جای حذف، آن را غیرفعال (متوقف) کنید تا در کاتالوگ نمایش داده نشود."
@@ -314,7 +360,14 @@ def item_delete(request, pk):
 
     if request.method == "POST":
         title = item.title
+        item_pk = item.pk
         item.delete()
+        logger.info(
+            "Item deleted: item_id=%s title=%s user_id=%s",
+            item_pk,
+            title,
+            request.user.pk,
+        )
         messages.success(request, f"کالای «{title}» با موفقیت حذف شد.")
         return redirect("catalog:my_items")
 

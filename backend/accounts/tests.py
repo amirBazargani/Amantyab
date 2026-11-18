@@ -329,3 +329,96 @@ class SessionManagementTests(TestCase):
         self.assertNotIn("_auth_user_id", self.client.session)
         self.assertNotIn("catalog_search_filters", self.client.session)
 
+
+class AccountsLoggingTests(TestCase):
+    def setUp(self):
+        self.user = User.objects.create_user(
+            username="loguser",
+            email="loguser@example.com",
+            password="StrongPassword123!",
+            first_name="محمد",
+            last_name="رضایی",
+            phone="09121234567",
+        )
+
+    def test_login_success_logs_to_security(self):
+        login_url = reverse("accounts:login")
+        with self.assertLogs("amanatyab.security", level="INFO") as cm:
+            response = self.client.post(
+                login_url,
+                {"username": "loguser", "password": "StrongPassword123!"},
+                follow=True,
+            )
+        self.assertEqual(response.status_code, 200)
+        self.assertTrue(
+            any("Login successful: user_id=" in msg and "username=loguser" in msg for msg in cm.output),
+            f"Expected login success log in {cm.output}",
+        )
+
+    def test_login_failure_logs_to_security(self):
+        login_url = reverse("accounts:login")
+        with self.assertLogs("amanatyab.security", level="WARNING") as cm:
+            response = self.client.post(
+                login_url,
+                {"username": "loguser", "password": "WrongPassword!"},
+            )
+        self.assertEqual(response.status_code, 200)
+        self.assertTrue(
+            any("Login failed: username=loguser" in msg for msg in cm.output),
+            f"Expected login failure log in {cm.output}",
+        )
+
+    def test_signup_logs_to_accounts(self):
+        signup_url = reverse("accounts:signup")
+        with self.assertLogs("amanatyab.accounts", level="INFO") as cm:
+            response = self.client.post(
+                signup_url,
+                {
+                    "username": "newlogger",
+                    "email": "newlogger@example.com",
+                    "phone": "09129998877",
+                    "first_name": "احمد",
+                    "last_name": "کرمی",
+                    "password1": "SecurePass1234!",
+                    "password2": "SecurePass1234!",
+                },
+                follow=True,
+            )
+        self.assertEqual(response.status_code, 200)
+        self.assertTrue(
+            any("New user registered: user_id=" in msg and "username=newlogger" in msg for msg in cm.output),
+            f"Expected signup log in {cm.output}",
+        )
+
+    def test_logout_and_profile_edit_log_to_accounts(self):
+        self.client.force_login(self.user)
+        # 1. Profile edit log
+        with self.assertLogs("amanatyab.accounts", level="INFO") as cm:
+            resp = self.client.post(
+                reverse("accounts:profile"),
+                {
+                    "first_name": "محمدعلی",
+                    "last_name": "رضایی",
+                    "phone": "09121234567",
+                    "city": "تهران",
+                    "neighborhood": "سعادت‌آباد",
+                    "bio": "به‌روزرسانی بیوگرافی",
+                },
+                follow=True,
+            )
+        self.assertEqual(resp.status_code, 200)
+        self.assertTrue(
+            any("Profile updated: user_id=" in msg for msg in cm.output),
+            f"Expected profile update log in {cm.output}",
+        )
+
+        # 2. Logout log
+        with self.assertLogs("amanatyab.accounts", level="INFO") as cm_logout:
+            resp_logout = self.client.post(reverse("accounts:logout"), follow=True)
+        self.assertEqual(resp_logout.status_code, 200)
+        self.assertTrue(
+            any("User logged out: user_id=" in msg for msg in cm_logout.output),
+            f"Expected logout log in {cm_logout.output}",
+        )
+
+

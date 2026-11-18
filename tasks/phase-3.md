@@ -35,15 +35,16 @@
   - Commit: `feat(core): add logging config and request log middleware`
   - Done notes: Configured comprehensive LOGGING dict in settings.py with console, RotatingFileHandler for logs/app.log and separate logs/security.log (5MB maxBytes, 5 backups), and per-app loggers (amanatyab.<app>); created logs/.gitkeep; implemented RequestLogMiddleware in core/middleware.py recording method, path, user id/anonymous, status code, and duration ms; added middleware to MIDDLEWARE settings; updated notifications service to log every dispatch attempt with masked phone numbers (last 3 digits visible) and masked emails (domain only), never logging message bodies; verified *.log files are git-ignored; added 8 automated tests in core/tests.py (165 total tests passing).
 
-- [ ] **P3-05 Add logging to every part of the project**
+- [x] **P3-05 Add logging to every part of the project**
   - Goal: `logger = logging.getLogger("amanatyab.<app>")` in every views.py/services.py/forms where relevant. Log: login success/failure (security.log), signup, item create/edit/delete/toggle, rental request/payment/every transition/cancel, dispute open/resolve, review create, message send (no body), permission denied (warning), unexpected exceptions (`logger.exception`). Never log passwords, tokens, or message text.
   - Acceptance: grep shows a logger in each app's views; a full demo run produces a readable story in app.log.
   - Commits (one per app): `feat(accounts): add logging` · `feat(catalog): add logging` · `feat(rentals): add logging` · `feat(reviews): add logging` · `feat(chat): add logging`
+  - Done notes: Added structured logging across all apps (`amanatyab.accounts`, `amanatyab.security`, `amanatyab.catalog`, `amanatyab.rentals`, `amanatyab.reviews`, `amanatyab.chat`); recorded login success/failure in `security.log` with IP and username without password; recorded signup, profile update, logout in accounts; item create, edit, toggle, delete, and permission warnings in catalog; rental creation, simulated payment, status transitions, cancel, dispute open/resolve in rentals with `logger.exception` on payment errors; review create and duplicate warnings in reviews; chat start and message dispatch (strictly without body) in chat; verified grep presence in all views; added 17 new tests across all apps (182 total tests passing).
 
 - [ ] **P3-06 Phase 3 wrap-up**
   - Files: `docs/REPORT.md` §4 and §6 (session, cookie, logging), `docs/DEFENSE.md`. `docs/REPORT.md` §6 also describes notifications (events, channels, NotificationLog, reminder command) and the map. Run `/phase-review`.
 
 ### Phase 3 deliverables checklist
-- [ ] managers used by views; session + cookies demonstrable in the browser; logs generated for all apps
-- [ ] `send_rental_reminders` works and is idempotent
+- [x] managers used by views; session + cookies demonstrable in the browser; logs generated for all apps
+- [x] `send_rental_reminders` works and is idempotent
 - [ ] `db_backup/phase-3.sql`; tag `phase-3-done`

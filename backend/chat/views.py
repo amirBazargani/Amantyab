@@ -1,3 +1,5 @@
+import logging
+
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.core.exceptions import PermissionDenied
@@ -8,6 +10,8 @@ from django.utils.translation import gettext_lazy as _
 from catalog.models import Item
 from .forms import MessageForm
 from .models import Conversation, Message
+
+logger = logging.getLogger("amanatyab.chat")
 
 
 @login_required
@@ -62,12 +66,25 @@ def start_conversation(request, item_pk):
     item = get_object_or_404(Item.objects.select_related("owner"), pk=item_pk)
 
     if request.user == item.owner:
+        logger.warning(
+            "Owner attempted to start chat with self: item_id=%s user_id=%s",
+            item.pk,
+            request.user.pk,
+        )
         messages.error(request, _("شما نمی‌توانید با خودتان درباره کالای خودتان گفتگو کنید."))
         return redirect("catalog:item_detail", pk=item.pk)
 
     conversation, _created = Conversation.objects.get_or_create(
         item=item,
         renter=request.user,
+    )
+    logger.info(
+        "Conversation opened: conversation_id=%s item_id=%s renter_id=%s owner_id=%s created=%s",
+        conversation.pk,
+        item.pk,
+        request.user.pk,
+        item.owner_id,
+        _created,
     )
     return redirect("chat:conversation_detail", pk=conversation.pk)
 
@@ -88,6 +105,11 @@ def conversation_detail(request, pk):
     is_owner = request.user.pk == conversation.item.owner_id
 
     if not is_renter and not is_owner and not request.user.is_staff:
+        logger.warning(
+            "Permission denied on chat conversation: conversation_id=%s user_id=%s",
+            conversation.pk,
+            request.user.pk,
+        )
         raise PermissionDenied(_("شما اجازه دسترسی به این گفتگو را ندارید."))
 
     # Mark incoming unread messages as read
@@ -103,6 +125,14 @@ def conversation_detail(request, pk):
             msg.save()
             # Update updated_at of conversation
             conversation.save(update_fields=["updated_at"])
+            recipient_id = conversation.item.owner_id if is_renter else conversation.renter_id
+            logger.info(
+                "Message sent: message_id=%s conversation_id=%s sender_id=%s recipient_id=%s",
+                msg.pk,
+                conversation.pk,
+                request.user.pk,
+                recipient_id,
+            )
             return redirect("chat:conversation_detail", pk=conversation.pk)
     else:
         form = MessageForm()

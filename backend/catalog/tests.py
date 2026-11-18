@@ -1101,5 +1101,118 @@ class CatalogCookieTests(TestCase):
         self.assertEqual(get_recent_item_ids(check_req), [self.item2.pk])
 
 
+class CatalogLoggingTests(TestCase):
+    def setUp(self):
+        self.owner = User.objects.create_user(
+            username="cat_owner",
+            password="Password123!",
+            phone="09123334455",
+            email="owner@example.com",
+        )
+        self.other_user = User.objects.create_user(
+            username="cat_other",
+            password="Password123!",
+            phone="09124445566",
+            email="other@example.com",
+        )
+        self.category = Category.objects.create(name="ابزار برقی", slug="tools")
+        self.item = Item.objects.create(
+            owner=self.owner,
+            category=self.category,
+            title="دریل تخریب",
+            daily_price=Decimal("150000"),
+            deposit_amount=Decimal("500000"),
+            city="تهران",
+            is_active=True,
+        )
+
+    def test_item_create_logs_to_catalog(self):
+        self.client.force_login(self.owner)
+        url = reverse("catalog:item_create")
+        data = {
+            "title": "اره فارسی‌بر",
+            "category": self.category.pk,
+            "daily_price": "200000",
+            "deposit_amount": "800000",
+            "condition": Item.Condition.GOOD,
+            "city": "تهران",
+            "neighborhood": "پونک",
+            "allow_pickup": "on",
+            "allow_courier": "on",
+            "description": "دستگاه تمیز و سالم",
+            "images-TOTAL_FORMS": "0",
+            "images-INITIAL_FORMS": "0",
+            "images-MIN_NUM_FORMS": "0",
+            "images-MAX_NUM_FORMS": "5",
+        }
+        with self.assertLogs("amanatyab.catalog", level="INFO") as cm:
+            resp = self.client.post(url, data, follow=True)
+        self.assertEqual(resp.status_code, 200)
+        self.assertTrue(
+            any("Item created: item_id=" in msg and "اره فارسی‌بر" in msg for msg in cm.output),
+            f"Expected item create log in {cm.output}",
+        )
+
+    def test_item_edit_and_toggle_and_delete_logging(self):
+        self.client.force_login(self.owner)
+        # 1. Edit
+        edit_url = reverse("catalog:item_edit", kwargs={"pk": self.item.pk})
+        edit_data = {
+            "title": "دریل تخریب ارتقایافته",
+            "category": self.category.pk,
+            "daily_price": "180000",
+            "deposit_amount": "500000",
+            "condition": Item.Condition.GOOD,
+            "city": "تهران",
+            "neighborhood": "ونک",
+            "allow_pickup": "on",
+            "allow_courier": "on",
+            "description": "توضیحات جدید",
+            "images-TOTAL_FORMS": "0",
+            "images-INITIAL_FORMS": "0",
+            "images-MIN_NUM_FORMS": "0",
+            "images-MAX_NUM_FORMS": "5",
+        }
+        with self.assertLogs("amanatyab.catalog", level="INFO") as cm_edit:
+            resp = self.client.post(edit_url, edit_data, follow=True)
+        self.assertEqual(resp.status_code, 200)
+        self.assertTrue(
+            any("Item edited: item_id=" in msg for msg in cm_edit.output),
+            f"Expected item edit log in {cm_edit.output}",
+        )
+
+        # 2. Toggle active
+        toggle_url = reverse("catalog:item_toggle_active", kwargs={"pk": self.item.pk})
+        with self.assertLogs("amanatyab.catalog", level="INFO") as cm_toggle:
+            resp = self.client.post(toggle_url, follow=True)
+        self.assertEqual(resp.status_code, 200)
+        self.assertTrue(
+            any("Item active status toggled: item_id=" in msg and "is_active=False" in msg for msg in cm_toggle.output),
+            f"Expected toggle log in {cm_toggle.output}",
+        )
+
+        # 3. Delete
+        del_url = reverse("catalog:item_delete", kwargs={"pk": self.item.pk})
+        with self.assertLogs("amanatyab.catalog", level="INFO") as cm_del:
+            resp = self.client.post(del_url, follow=True)
+        self.assertEqual(resp.status_code, 200)
+        self.assertTrue(
+            any("Item deleted: item_id=" in msg for msg in cm_del.output),
+            f"Expected delete log in {cm_del.output}",
+        )
+
+    def test_permission_denied_warning_logged(self):
+        self.client.force_login(self.other_user)
+        edit_url = reverse("catalog:item_edit", kwargs={"pk": self.item.pk})
+        with self.assertLogs("amanatyab.catalog", level="WARNING") as cm:
+            resp = self.client.get(edit_url)
+        self.assertEqual(resp.status_code, 403)
+        self.assertTrue(
+            any("Permission denied on item edit" in msg for msg in cm.output),
+            f"Expected permission warning in {cm.output}",
+        )
+
+
+
 
 
