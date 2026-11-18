@@ -1,3 +1,4 @@
+import logging
 import math
 import uuid
 from decimal import Decimal, ROUND_HALF_UP
@@ -9,6 +10,8 @@ from django.utils import timezone
 from django.utils.translation import gettext_lazy as _
 
 from .models import Dispute, Payment, Rental
+
+logger = logging.getLogger("amanatyab.rentals")
 
 
 def calculate_price(item, start_at, end_at, commission_rate=Decimal("0.15")):
@@ -137,6 +140,15 @@ def create_rental(
     )
     rental.full_clean()
     rental.save()
+    logger.info(
+        "Rental request created: rental_id=%s item_id=%s renter_id=%s owner_id=%s rent_amount=%s deposit_amount=%s",
+        rental.pk,
+        item.pk,
+        renter.pk,
+        item.owner_id,
+        rental.rent_amount,
+        rental.deposit_amount,
+    )
     return rental
 
 
@@ -200,6 +212,14 @@ def simulate_payment(rental):
 
     rental.status = Rental.Status.CONFIRMED
     rental.save(update_fields=["status", "tracking_code", "updated_at"])
+
+    logger.info(
+        "Payment processed: rental_id=%s renter_id=%s tracking_code=%s total_paid=%s",
+        rental.pk,
+        rental.renter_id,
+        rental.tracking_code,
+        rental.rent_amount + rental.deposit_amount,
+    )
 
     return rental, created_payments
 
@@ -302,6 +322,7 @@ def handover_rental(rental, user):
 
     rental.status = Rental.Status.HANDED_OVER
     rental.save(update_fields=["status", "updated_at"])
+    logger.info("Rental handed over: rental_id=%s user_id=%s", rental.pk, user.pk)
     return rental
 
 
@@ -325,6 +346,7 @@ def mark_returned_rental(rental, user):
 
     rental.status = Rental.Status.RETURNED
     rental.save(update_fields=["status", "updated_at"])
+    logger.info("Rental returned: rental_id=%s user_id=%s", rental.pk, user.pk)
     return rental
 
 
@@ -380,6 +402,13 @@ def confirm_return_rental(rental, user):
 
     rental.status = Rental.Status.COMPLETED
     rental.save(update_fields=["status", "updated_at"])
+    logger.info(
+        "Rental completed: rental_id=%s user_id=%s owner_payout=%s deposit_refund=%s",
+        rental.pk,
+        user.pk,
+        rental.owner_payout,
+        rental.deposit_amount,
+    )
     return rental
 
 
@@ -419,6 +448,7 @@ def cancel_rental(rental, user):
 
     rental.status = Rental.Status.CANCELLED
     rental.save(update_fields=["status", "updated_at"])
+    logger.info("Rental cancelled: rental_id=%s user_id=%s", rental.pk, user.pk)
     return rental
 
 
@@ -455,6 +485,12 @@ def open_dispute(rental, user, reason):
 
     rental.status = Rental.Status.DISPUTED
     rental.save(update_fields=["status", "updated_at"])
+    logger.info(
+        "Dispute opened: dispute_id=%s rental_id=%s opened_by=%s",
+        dispute.pk,
+        rental.pk,
+        user.pk,
+    )
     return dispute
 
 
@@ -575,6 +611,14 @@ def resolve_dispute(dispute, admin_user, deposit_decision, resolution_note=""):
     # 4. Complete the rental
     rental.status = Rental.Status.COMPLETED
     rental.save(update_fields=["status", "updated_at"])
+
+    logger.info(
+        "Dispute resolved: dispute_id=%s rental_id=%s admin_id=%s decision=%s",
+        dispute.pk,
+        rental.pk,
+        admin_user.pk,
+        deposit_decision,
+    )
 
     return dispute
 

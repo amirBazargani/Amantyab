@@ -1734,3 +1734,146 @@ class SendRentalRemindersCommandTests(TestCase):
         self.assertIsNotNone(self.rental_2h.reminder_sent_at)
 
 
+class RentalsLoggingTests(TestCase):
+    def setUp(self):
+        self.owner = User.objects.create_user(
+            username="r_owner",
+            password="Password123!",
+            phone="09121113355",
+            email="ro@example.com",
+        )
+        self.renter = User.objects.create_user(
+            username="r_renter",
+            password="Password123!",
+            phone="09122224466",
+            email="rr@example.com",
+        )
+        self.admin = User.objects.create_user(
+            username="r_admin",
+            password="Password123!",
+            phone="09129990000",
+            email="admin@example.com",
+            is_staff=True,
+        )
+        self.category = Category.objects.create(name="ابزار باغبانی", slug="garden")
+        self.item = Item.objects.create(
+            owner=self.owner,
+            category=self.category,
+            title="اره زنجیری بنزینی",
+            daily_price=Decimal("120000"),
+            deposit_amount=Decimal("400000"),
+            city="تهران",
+            allow_pickup=True,
+            is_active=True,
+        )
+
+    def test_rental_lifecycle_logging(self):
+        now = timezone.now()
+        start = now + timedelta(days=1)
+        end = now + timedelta(days=3)
+
+        # 1. create_rental log
+        with self.assertLogs("amanatyab.rentals", level="INFO") as cm:
+            rental = create_rental(
+                renter=self.renter,
+                item=self.item,
+                start_at=start,
+                end_at=end,
+            )
+        self.assertTrue(
+            any("Rental request created: rental_id=" in msg for msg in cm.output),
+            f"Expected create log in {cm.output}",
+        )
+
+        # 2. simulate_payment log
+        with self.assertLogs("amanatyab.rentals", level="INFO") as cm:
+            rental, _ = simulate_payment(rental)
+        self.assertTrue(
+            any("Payment processed: rental_id=" in msg for msg in cm.output),
+            f"Expected payment log in {cm.output}",
+        )
+
+        # 3. handover log
+        with self.assertLogs("amanatyab.rentals", level="INFO") as cm:
+            rental = handover_rental(rental, self.owner)
+        self.assertTrue(
+            any("Rental handed over: rental_id=" in msg for msg in cm.output),
+            f"Expected handover log in {cm.output}",
+        )
+
+        # 4. return log
+        with self.assertLogs("amanatyab.rentals", level="INFO") as cm:
+            rental = mark_returned_rental(rental, self.renter)
+        self.assertTrue(
+            any("Rental returned: rental_id=" in msg for msg in cm.output),
+            f"Expected return log in {cm.output}",
+        )
+
+        # 5. confirm return log
+        with self.assertLogs("amanatyab.rentals", level="INFO") as cm:
+            rental = confirm_return_rental(rental, self.owner)
+        self.assertTrue(
+            any("Rental completed: rental_id=" in msg for msg in cm.output),
+            f"Expected completion log in {cm.output}",
+        )
+
+    def test_cancel_rental_logging(self):
+        now = timezone.now()
+        rental = create_rental(
+            renter=self.renter,
+            item=self.item,
+            start_at=now + timedelta(days=5),
+            end_at=now + timedelta(days=7),
+        )
+        with self.assertLogs("amanatyab.rentals", level="INFO") as cm:
+            cancel_rental(rental, self.renter)
+        self.assertTrue(
+            any("Rental cancelled: rental_id=" in msg for msg in cm.output),
+            f"Expected cancel log in {cm.output}",
+        )
+
+    def test_dispute_open_and_resolve_logging(self):
+        now = timezone.now()
+        rental = create_rental(
+            renter=self.renter,
+            item=self.item,
+            start_at=now + timedelta(days=1),
+            end_at=now + timedelta(days=3),
+        )
+        rental, _ = simulate_payment(rental)
+        rental = handover_rental(rental, self.owner)
+
+        # 1. Dispute open log
+        with self.assertLogs("amanatyab.rentals", level="INFO") as cm:
+            dispute = open_dispute(rental, self.renter, "خرابی اره زنجیری")
+        self.assertTrue(
+            any("Dispute opened: dispute_id=" in msg for msg in cm.output),
+            f"Expected dispute open log in {cm.output}",
+        )
+
+        # 2. Dispute resolve log
+        with self.assertLogs("amanatyab.rentals", level="INFO") as cm:
+            resolve_dispute(
+                dispute,
+                self.admin,
+                Dispute.DepositDecision.RETURN_TO_RENTER,
+                "ودیعه عودت گردید",
+            )
+        self.assertTrue(
+            any("Dispute resolved: dispute_id=" in msg for msg in cm.output),
+            f"Expected dispute resolve log in {cm.output}",
+        )
+
+    def test_permission_denied_warning_logging(self):
+        self.client.force_login(self.renter)
+        # Non-staff accessing admin dashboard
+        with self.assertLogs("amanatyab.rentals", level="WARNING") as cm:
+            resp = self.client.get(reverse("rentals:admin_dashboard"))
+        self.assertEqual(resp.status_code, 403)
+        self.assertTrue(
+            any("Permission denied on admin dashboard" in msg for msg in cm.output),
+            f"Expected admin warning log in {cm.output}",
+        )
+
+
+
