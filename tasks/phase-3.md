@@ -14,11 +14,12 @@
   - Commits: `feat(rentals): add ending_soon queryset method` (only if not already in P3-01) · `feat(rentals): add send_rental_reminders command`
   - Done notes: Implemented send_rental_reminders management command supporting --hours, --loop, and --interval; configured RENTAL_REMINDER_HOURS in settings.py; formatted end_at in Asia/Tehran for rental_ending_soon notification template; added cron and Windows Task Scheduler docs in README.md; added unit tests verifying idempotency, channel deliveries, and arguments (136 total tests passing).
 
-- [ ] **P3-02 Session management**
+- [x] **P3-02 Session management**
   - Files: `config/settings.py`, `accounts/views.py`, `catalog/views.py`.
   - Goal: DB-backed sessions; SESSION_COOKIE_AGE 2 weeks; SESSION_COOKIE_HTTPONLY; "remember me" checkbox on login (`request.session.set_expiry(0)` when unchecked); store last search filters in session and prefill the list page; session cleared on logout; `manage.py clearsessions` noted in README.
   - Acceptance: unchecked remember-me → session ends with browser; search filters persist across pages in same session.
   - Commit: `feat(accounts): add session settings and remember-me` · `feat(catalog): persist search filters in session`
+  - Done notes: Configured DB-backed sessions with 2 weeks SESSION_COOKIE_AGE and SESSION_COOKIE_HTTPONLY; implemented remember_me checkbox on login (set_expiry(0) when unchecked); stored active search filters in request.session and prefilled catalog list page on subsequent visits; supported ?clear=1 to reset filters; ensured full session flush on logout; added clearsessions documentation in README; added 8 unit tests in accounts and catalog (144 total tests passing).
 
 - [ ] **P3-03 Cookie management**
   - Files: `core/cookies.py` (helpers), `catalog/views.py`, `templates/partials/recent_items.html`, home template.

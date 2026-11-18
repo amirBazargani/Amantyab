@@ -150,4 +150,9 @@ LOGIN_URL = "accounts:login"
 LOGIN_REDIRECT_URL = "accounts:profile"
 LOGOUT_REDIRECT_URL = "core:home"
 
+# Session settings (DB-backed, 2 weeks expiry, HTTP-only cookie)
+SESSION_ENGINE = "django.contrib.sessions.backends.db"
+SESSION_COOKIE_AGE = 1209600  # 2 weeks in seconds (14 * 24 * 60 * 60)
+SESSION_COOKIE_HTTPONLY = True
+
 

@@ -20,11 +20,38 @@ def item_list(request):
     """
     Catalog browse view with filtering by search term (q), category, city, and max daily price.
     Only active items are shown to the public. Uses chained ItemQuerySet methods.
+    Stores and persists active search filters in request.session across page visits.
     """
-    q = request.GET.get("q", "").strip()
-    category_param = request.GET.get("category", "").strip()
-    city = request.GET.get("city", "").strip()
-    max_price_param = request.GET.get("max_price", "").strip()
+    filter_keys = ("q", "category", "city", "max_price")
+    is_clearing = "clear" in request.GET
+
+    if is_clearing:
+        request.session.pop("catalog_search_filters", None)
+        q = ""
+        category_param = ""
+        city = ""
+        max_price_param = ""
+    elif any(key in request.GET for key in filter_keys):
+        q = request.GET.get("q", "").strip()
+        category_param = request.GET.get("category", "").strip()
+        city = request.GET.get("city", "").strip()
+        max_price_param = request.GET.get("max_price", "").strip()
+
+        if any([q, category_param, city, max_price_param]):
+            request.session["catalog_search_filters"] = {
+                "q": q,
+                "category": category_param,
+                "city": city,
+                "max_price": max_price_param,
+            }
+        else:
+            request.session.pop("catalog_search_filters", None)
+    else:
+        saved_filters = request.session.get("catalog_search_filters") or {}
+        q = saved_filters.get("q", "").strip()
+        category_param = saved_filters.get("category", "").strip()
+        city = saved_filters.get("city", "").strip()
+        max_price_param = saved_filters.get("max_price", "").strip()
 
     queryset = (
         Item.objects.active()

@@ -72,7 +72,7 @@
                         <span>اعمال فیلتر</span>
                     </button>
                     {% if q or selected_category or selected_city or max_price %}
-                        <a href="{% url 'catalog:item_list' %}" class="bg-gray-100 hover:bg-gray-200 text-gray-700 py-2.5 px-3 rounded-xl transition text-sm flex items-center justify-center" title="پاک‌سازی فیلترها">
+                        <a href="{% url 'catalog:item_list' %}?clear=1" class="bg-gray-100 hover:bg-gray-200 text-gray-700 py-2.5 px-3 rounded-xl transition text-sm flex items-center justify-center" title="پاک‌سازی فیلترها">
                             <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
                             </svg>

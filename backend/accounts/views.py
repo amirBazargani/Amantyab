@@ -44,6 +44,11 @@ def login_view(request):
         if form.is_valid():
             user = form.get_user()
             login(request, user)
+            remember_me = form.cleaned_data.get("remember_me", False)
+            if not remember_me:
+                request.session.set_expiry(0)
+            else:
+                request.session.set_expiry(None)
             messages.success(
                 request,
                 f"خوش آمدید، {user.first_name or user.username}!",
@@ -66,11 +71,6 @@ def login_view(request):
 
 
 def logout_view(request):
-    if request.method == "POST":
-        logout(request)
-        messages.info(request, "شما با موفقیت از حساب کاربری خود خارج شدید.")
-        return redirect("core:home")
-    # Also handle GET safely by redirecting
     logout(request)
     messages.info(request, "شما با موفقیت از حساب کاربری خود خارج شدید.")
     return redirect("core:home")

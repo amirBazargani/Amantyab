@@ -908,3 +908,98 @@ class ItemQuerySetTests(TestCase):
         )
         self.assertEqual(list(qs), [self.item1])
 
+
+class CatalogSessionFilterTests(TestCase):
+    def setUp(self):
+        self.owner = User.objects.create_user(
+            username="itemowner",
+            email="itemowner@example.com",
+            password="StrongPassword123!",
+            phone="09121112233",
+            city="تهران",
+        )
+        self.cat_tools = Category.objects.create(name="ابزارآلات", slug="tools")
+        self.cat_camping = Category.objects.create(name="کمپینگ", slug="camping")
+
+        self.drill = Item.objects.create(
+            owner=self.owner,
+            category=self.cat_tools,
+            title="دریل چکشی رونیکس",
+            description="دریل قدرتمند",
+            daily_price=Decimal("50000"),
+            deposit_amount=Decimal("100000"),
+            city="تهران",
+            allow_pickup=True,
+            is_active=True,
+        )
+        self.tent = Item.objects.create(
+            owner=self.owner,
+            category=self.cat_camping,
+            title="چادر مسافرتی ۴ نفره",
+            description="چادر ضدآب",
+            daily_price=Decimal("80000"),
+            deposit_amount=Decimal("200000"),
+            city="اصفهان",
+            allow_pickup=True,
+            is_active=True,
+        )
+
+    def test_search_filters_saved_in_session(self):
+        url = reverse("catalog:item_list")
+        response = self.client.get(
+            url,
+            {"q": "دریل", "category": "tools", "city": "تهران", "max_price": "60000"},
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertIn(self.drill, response.context["items"])
+        self.assertNotIn(self.tent, response.context["items"])
+
+        # Check session
+        saved = self.client.session.get("catalog_search_filters")
+        self.assertIsNotNone(saved)
+        self.assertEqual(saved["q"], "دریل")
+        self.assertEqual(saved["category"], "tools")
+        self.assertEqual(saved["city"], "تهران")
+        self.assertEqual(saved["max_price"], "60000")
+
+    def test_search_filters_prefilled_on_subsequent_visit_without_params(self):
+        # First visit with query
+        url = reverse("catalog:item_list")
+        self.client.get(url, {"q": "چادر"})
+
+        # Second visit without any GET params (e.g. returning via navbar)
+        response = self.client.get(url)
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.context["q"], "چادر")
+        self.assertIn(self.tent, response.context["items"])
+        self.assertNotIn(self.drill, response.context["items"])
+
+    def test_clear_removes_filters_from_session(self):
+        url = reverse("catalog:item_list")
+        # Save filter in session
+        self.client.get(url, {"q": "دریل"})
+        self.assertIn("catalog_search_filters", self.client.session)
+
+        # Clear filters with ?clear=1
+        response = self.client.get(url, {"clear": "1"})
+        self.assertEqual(response.status_code, 200)
+        self.assertNotIn("catalog_search_filters", self.client.session)
+        self.assertEqual(response.context["q"], "")
+        self.assertIn(self.drill, response.context["items"])
+        self.assertIn(self.tent, response.context["items"])
+
+    def test_submitting_all_empty_filters_clears_session(self):
+        url = reverse("catalog:item_list")
+        # Save filter
+        self.client.get(url, {"q": "دریل"})
+        self.assertIn("catalog_search_filters", self.client.session)
+
+        # Submit empty form
+        response = self.client.get(url, {"q": "", "category": "", "city": "", "max_price": ""})
+        self.assertEqual(response.status_code, 200)
+        self.assertNotIn("catalog_search_filters", self.client.session)
+        self.assertEqual(response.context["q"], "")
+        self.assertIn(self.drill, response.context["items"])
+        self.assertIn(self.tent, response.context["items"])
+
+
