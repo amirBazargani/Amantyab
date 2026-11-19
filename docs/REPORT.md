@@ -541,6 +541,7 @@ items = (
 | **accounts** | `resend_verification` | `resend_verification` | `/accounts/resend-verification/` | GET, POST | لاگین‌شده تاییدنشده | `accounts/verify_sent.html` | درخواست ارسال مجدد ایمیل حاوی لینک فعال‌سازی ۲۴ ساعته حساب کاربری |
 | **accounts** | `public_profile_view` | `public_profile` | `/accounts/users/<str:username>/` | GET | عمومی (همه) | `accounts/public_profile.html` | نمایش پروفایل عمومی کاربر، میانگین امتیاز، نظرات و کالاهای فعال او |
 | **catalog** | `item_list` | `item_list` | `/catalog/` | GET | عمومی (همه) | `catalog/item_list.html` | مرور و جستجوی کالاها با فیلتر دسته‌بندی، کلیدواژه، شهر، ماندگاری در سشن و نقشه |
+| **catalog** | `item_search_json` | `item_search_json` | `/catalog/search-json/` | GET | عمومی (همه) | _ندارد (پاسخ JSON)_ | جستجو و فیلتر زنده اقلام همراه با پاسخ JSON برای جزیره ری‌اکت Live Search |
 | **catalog** | `my_items` | `my_items` | `/catalog/my-items/` | GET | لاگین‌شده (`@login_required`) | `catalog/my_items.html` | داشبورد کالاهای من جهت مدیریت، ویرایش، حذف و تغییر وضعیت فعال/غیرفعال |
 | **catalog** | `item_create` | `item_create` | `/catalog/new/` | GET, POST | لاگین‌شده و تایید ایمیل (`@verified_required`) | `catalog/item_form.html` | ثبت کالای جدید، بارگذاری تصاویر با بهینه‌سازی خودکار، تعیین قیمت و موقعیت روی نقشه |
 | **catalog** | `item_detail` | `item_detail` | `/catalog/<int:pk>/` | GET | عمومی (همه) | `catalog/item_detail.html` | جزئیات کالا، گالری تصاویر، قیمت، ودیعه، نقشه تقریبی محله، نظرات و ذخیره کوکی بازدید |
@@ -548,6 +549,7 @@ items = (
 | **catalog** | `item_toggle_active` | `item_toggle_active` | `/catalog/<int:pk>/toggle-active/` | POST | فقط مالک کالا (`Item.owner`) | _ندارد (ریدایرکت به my_items)_ | فعال یا غیرفعال‌سازی سریع کالا جهت پنهان‌سازی از کاتالوگ عمومی |
 | **catalog** | `item_delete` | `item_delete` | `/catalog/<int:pk>/delete/` | POST | فقط مالک کالا (`Item.owner`) | _ندارد (ریدایرکت به my_items)_ | حذف کالا از سامانه مشروط به عدم وجود سابقه اجاره فعال |
 | **rentals** | `rental_request` | `rental_request` | `/rentals/request/<int:item_id>/` | GET, POST | لاگین‌شده و تایید ایمیل (به جز مالک کالا) | `rentals/rental_request.html` | ثبت درخواست رزرو با بررسی تداخل زمانی، شیوه تحویل، نشانی و نقطه تحویل روی نقشه |
+| **rentals** | `price_preview_json` | `price_preview_json` | `/rentals/price-preview-json/` | POST | عمومی (همه با توکن CSRF) | _ندارد (پاسخ JSON)_ | محاسبه آنی پیش‌نمایش قیمت اجاره و ودیعه جهت مصرف جزیره ری‌اکت در صفحه درخواست |
 | **rentals** | `my_rentals` | `my_rentals` | `/rentals/my-rentals/` | GET | لاگین‌شده (`@login_required`) | `rentals/my_rentals.html` | فهرست سفارش‌های اجاره کاربر به عنوان مستأجر با فیلتر وضعیت و کوئری‌های بهینه |
 | **rentals** | `owner_rentals` | `owner_rentals` | `/rentals/owner-rentals/` | GET | لاگین‌شده (`@login_required`) | `rentals/owner_rentals.html` | فهرست درخواست‌های اجاره دریافتی کالاهای کاربر به عنوان موجر |
 | **rentals** | `rental_pay` | `rental_pay` | `/rentals/<int:pk>/pay/` | GET, POST | فقط مستأجر سفارش (`renter`) | `rentals/rental_pay.html` | درگاه پرداخت شبیه‌سازی‌شده جهت پرداخت وجه اجاره و ودیعه |
@@ -645,19 +647,31 @@ items = (
 
 ---
 
-### ۶-۷. خلاصه مجموعه تست‌های خودکار (Automated Test Suite Summary)
-سامانه امانت‌یاب در حال حاضر دارای **۲۲۷ تست خودکار واحد و یکپارچگی (Unit & Integration Tests)** کاملاً پاس‌شده است که تمامی بخش‌های حیاتی سیستم را پوشش می‌دهند:
+### ۶-۷. معماری جزایر ری‌اکت و بیلد استاتیک Tailwind (React Islands Architecture)
+در فاز ۴، الزامات مدرن فرانت‌اند پروژه با رویکرد بدون پیچیدگی و متناسب با قالب‌های جنگو پیاده‌سازی گردید:
+- **معماری جزیره‌ای (Islands Architecture):** به‌جای ایجاد یک SPA سنگین که کنترل مسیریابی و سئو را از جنگو سلب کند، صفحات به صورت Server-Side در تمپلیت‌های جنگو رندر شده و بخش‌های تعاملی خاص به عنوان «جزایر ری‌اکت» روی المنت‌های `<div>` با اتریبیوت‌های `data-*` سوار (Mount) می‌شوند:
+  1. **جزیره جستجو و فیلتر زنده (`ItemSearchIsland`):** در صفحه کاتالوگ (`item_list.html`) مستقر شده و جستجوی لحظه‌ای با تکنیک Debounce (تاخیر ۳۰۰ میلی‌ثانیه) روی اندپوینت `/catalog/search-json/` انجام می‌دهد؛ در صورت غیرفعال بودن جاوااسکریپت، فرم جستجوی سنتی GET کارایی کامل خود را حفظ می‌کند (Progressive Enhancement).
+  2. **جزیره پیش‌نمایش قیمت رزرو (`PricePreviewIsland`):** در صفحه ثبت درخواست اجاره (`rental_request.html`) با تغییر فیلدهای تاریخ و ساعت تحویل و عودت، درخواست POST به همراه هدر `X-CSRFToken` به اندپوینت `/rentals/price-preview-json/` ارسال کرده و محاسبات مالی (مبلغ اجاره‌بها و ودیعه) را پیش از ثبت فرم به صورت زنده نمایش می‌دهد.
+- **محیط بیلد Vite و کامپایل محلی Tailwind CSS:**
+  - پوشه `frontend/` شامل Vite 6، React 18 و پیکربندی Tailwind CSS است.
+  - خروجی دستور `npm run build` مستقیماً در قالب فایل‌های بهینه و کم‌حجم `backend/static/dist/bundle.js` و `backend/static/dist/bundle.css` ذخیره می‌شود.
+  - وابستگی به CDN خارجی Tailwind به طور کامل حذف شده و استایل‌ها به صورت کامپایل‌شده محلی لود می‌شوند.
+
+---
+
+### ۶-۸. خلاصه مجموعه تست‌های خودکار (Automated Test Suite Summary)
+سامانه امانت‌یاب در حال حاضر دارای **۲۳۷ تست خودکار واحد و یکپارچگی (Unit & Integration Tests)** کاملاً پاس‌شده است که تمامی بخش‌های حیاتی سیستم را پوشش می‌دهند:
 - **ساختار ماژولار پکیج‌های تست:**
   - تمام اپلیکیشن‌های ۶ گانه (`accounts`, `catalog`, `rentals`, `reviews`, `chat`, `core`) دارای پوشه تست استاندارد شامل `test_models.py`, `test_forms.py`, `test_views.py`, `test_services.py` هستند.
   - تست‌های اختصاصی کوکی‌های امضاشده در `core/tests/test_cookies.py`.
 - **توزیع تست‌ها:**
   - `accounts` (۳۷ تست): اعتبارسنجی فیلدها، ثبت‌نام، ورود، نشست موقت و ماندگار، اعتبارسنجی تلفن، توکن‌های فعال‌سازی ایمیل و ارسال مجدد، دکوراتور `verified_required`.
-  - `catalog` (۴۸ تست): کوئری‌ست‌های ترکیبی، دسته‌بندی‌های درختی، محدودیت‌های مدل، ذخیره فیلترها در سشن، کوکی‌های امضاشده، آپلود و بهینه‌سازی ابعاد تصویر با Pillow، آزمون‌های `assertNumQueries`.
-  - `rentals` (۶۸ تست): ماشین وضعیت ۷ مرحله‌ای، بررسی تداخل زمانی و Double-Booking، اعتبارسنجی قیمت، محاسبات مالی و ودیعه، فرآیند داوری اختلاف، دستور `send_rental_reminders` و لاگ‌های تراکنش.
+  - `catalog` (۵۳ تست): کوئری‌ست‌های ترکیبی، دسته‌بندی‌های درختی، محدودیت‌های مدل، ذخیره فیلترها در سشن، کوکی‌های امضاشده، آپلود و بهینه‌سازی ابعاد تصویر با Pillow، آزمون‌های `assertNumQueries` و اندپوینت JSON جستجوی زنده.
+  - `rentals` (۷۳ تست): ماشین وضعیت ۷ مرحله‌ای، بررسی تداخل زمانی و Double-Booking، اعتبارسنجی قیمت، محاسبات مالی و ودیعه، فرآیند داوری اختلاف، دستور `send_rental_reminders`، لاگ‌های تراکنش و اندپوینت JSON پیش‌نمایش قیمت.
   - `reviews` (۱۷ تست): سیستم امتیازدهی ۱ تا ۵ ستاره، قیدهای یکتایی در دیتابیس، ممانعت از نظردهی تکراری، کوئری‌ست‌های محاسبه میانگین امتیاز و لاگ‌ها.
   - `chat` (۱۶ تست): تبادل پیام، جلوگیری از ارسال پیام به خود، دسترسی طرفین گفتگو، ممیزی عدم درج متن پیام در لاگ‌ها.
   - `core` (۴۱ تست): میدل‌ویر `RequestLogMiddleware`، توابع کمکی امضای کوکی و مقاومت در برابر Tampering، سرویس اعلان‌های چندکاناله ایمیل و پیامک و ثبت در `NotificationLog`.
-- **اجرای آسان تست‌ها:** با دستور استاندارد `python manage.py test` در کمتر از ۴ ثانیه روی دیتابیس تست PostgreSQL اجرا می‌شوند.
+- **اجرای آسان تست‌ها:** با دستور استاندارد `python manage.py test` روی دیتابیس تست PostgreSQL اجرا می‌شوند.
 
 ---
 

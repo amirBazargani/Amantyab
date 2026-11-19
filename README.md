@@ -20,6 +20,42 @@ End of each phase: `/phase-review`.
 - `tasks/phase-1..4.md` — every task with files, acceptance, commits
 - `backend/`, `frontend/`, `db_backup/` — created by the agent during the tasks
 
+## Quickstart (اجرای سریع پروژه از صفر)
+
+### ۱. راه‌اندازی پایگاه داده (PostgreSQL via Docker)
+```bash
+docker compose up -d
+```
+
+### ۲. آماده‌سازی پایتون و اعمال مایگریشن‌ها
+```bash
+python -m venv .venv
+source .venv/bin/activate  # در ویندوز: .venv\Scripts\activate
+cd backend
+python manage.py migrate
+```
+
+### ۳. بارگذاری داده‌های نمایشی (Seed Demo Data)
+```bash
+python manage.py seed_demo
+```
+کلیه داده‌های تستی شامل ۹ کاربر، ۶ دسته‌بندی، ۲۵ کالا با موقعیت مکانی، ۱۱ اجاره در تمامی وضعیت‌ها، پرداخت‌ها، نظرات، چت‌ها و اختلافات ایجاد شده و با رمز عبور `demo1234` در دسترس خواهند بود.
+
+### ۴. کامپایل فرانت‌اند (React Islands & Tailwind CSS)
+فایل‌های بیلد شده از قبل در مسیر `backend/static/dist/` کامیت شده‌اند. جهت کامپایل مجدد:
+```bash
+cd frontend
+npm install
+npm run build
+```
+
+### ۵. اجرای سرور توسعه
+```bash
+cd backend
+python manage.py runserver
+```
+سامانه در آدرس `http://127.0.0.1:8000` در دسترس است.
+
 ## Scheduling Background Commands
 
 ### Rental Ending Reminder (`send_rental_reminders`)
@@ -71,7 +107,7 @@ python manage.py clearsessions
 
 ## Running Automated Tests (اجرای تست‌های خودکار)
 
-The test suite covers models, constraints, pricing, state machine transitions, form validation, permission checks, dispute handling, cookies, notifications, and scheduled commands across all applications (220+ tests).
+The test suite covers models, constraints, pricing, state machine transitions, form validation, permission checks, dispute handling, cookies, notifications, React JSON endpoints, and scheduled commands across all applications (237 tests).
 
 ```bash
 # Activate your virtual environment and navigate to the backend directory:
