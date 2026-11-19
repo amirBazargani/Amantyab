@@ -34,9 +34,10 @@
   - Commits: `chore(frontend): scaffold Vite React Tailwind` · `feat(catalog): add live search island and JSON endpoint` · `feat(rentals): add price preview island and endpoint` · `chore: switch base template to built Tailwind assets`
   - Done notes: Scaffolded frontend/ with Vite 6, React 18, and Tailwind CSS compiling to backend/static/dist/bundle.js and bundle.css; removed Tailwind CDN from base.html; implemented item_search_json view in catalog/views.py and ItemSearchIsland React component with live debounced search and server-rendered fallback; implemented price_preview_json view in rentals/views.py and PricePreviewIsland React component syncing with datetime inputs and sending X-CSRFToken headers on POST; verified full test suite with 237 passing tests.
 
-- [ ] **P4-06 Gap-closing pass over phases 1–3**
+- [x] **P4-06 Gap-closing pass over phases 1–3**
   - Goal: run the checklist of each earlier phase again; fix what is missing or drifted; fresh-database run (`drop db → migrate → seed_demo → runserver`) must work; update docs.
   - Commit(s): `fix: ...` per gap.
+  - Done notes: Fixed seed_demo.py to explicitly assign is_email_verified = True for admin and demo users guaranteeing idempotent setup; verified complete clean database lifecycle (migrate applying 25 migrations cleanly, seed_demo populating 23 users, 9 categories, 32 items, 17 rentals, 25 payments, 9 reviews, 5 conversations, 2 disputes); updated docs/REPORT.md adding Phase 4 JSON endpoints (item_search_json, price_preview_json) bringing total views table to 35, documented React Islands and built Tailwind assets in section 6-7, and updated test suite count to 237; updated docs/QA-P2.md demo usernames; updated README.md with Quickstart setup and Vite compile instructions; verified all 237 tests passing green.
 
 - [ ] **P4-06A (optional) Real SMS gateway adapter**
   - Do ONLY if the human has a Kavenegar account/API key. Files: `core/sms.py` (KavenegarBackend using `urllib.request`, no new package), `.env.example` (`SMS_BACKEND`, `KAVENEGAR_API_KEY`, `KAVENEGAR_SENDER`).
