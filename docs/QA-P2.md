@@ -8,7 +8,7 @@
 ## ۰. آماده‌سازی و داده‌های اولیه (Setup & Seed Data)
 - [x] اجرای مایگریشن‌ها و اطمینان از سلامت پایگاه داده (`python manage.py migrate`)
 - [x] اجرای دستور درج داده‌های نمایشی اولیه (`python manage.py seed_demo`)
-- [x] ورود به سیستم با حساب مدیر (`admin` / `demo1234`) و کاربران تستی (`sara_tehran` / `demo1234`، `ali_esfahan` / `demo1234`)
+- [x] ورود به سیستم با حساب مدیر (`admin` / `demo1234`) و کاربران تستی (`sara` / `demo1234`، `ali` / `demo1234`، `reza` / `demo1234`)
 
 ---
 
