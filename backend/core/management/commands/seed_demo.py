@@ -73,6 +73,7 @@ class Command(BaseCommand):
         )
         admin_user.is_staff = True
         admin_user.is_superuser = True
+        admin_user.is_email_verified = True
         admin_user.set_password(demo_password)
         admin_user.save()
 
@@ -175,6 +176,7 @@ class Command(BaseCommand):
                 },
             )
             user_obj.phone = u["phone"]
+            user_obj.is_email_verified = True
             user_obj.set_password(demo_password)
             user_obj.save()
             users[u["username"]] = user_obj
