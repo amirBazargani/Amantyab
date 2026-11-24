@@ -1,6 +1,13 @@
 {% extends "base.html" %}
+{% load static %}
 
 {% block title %}کاتالوگ و جستجوی کالاها | امانت‌یاب{% endblock %}
+
+{% block extra_head %}
+<!-- Leaflet CSS & JS (Local with CDN fallback) -->
+<link rel="stylesheet" href="{% static 'vendor/leaflet/leaflet.css' %}" onerror="this.onerror=null;this.href='https://unpkg.com/leaflet@1.9.4/dist/leaflet.css';" />
+<script src="{% static 'vendor/leaflet/leaflet.js' %}"></script>
+{% endblock %}
 
 {% block content %}
 <div class="max-w-7xl mx-auto my-6 space-y-6">
@@ -113,6 +120,23 @@
         {% endif %}
     </div>
 
+    <!-- Neighborhood Map Overview -->
+    <div class="bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden">
+        <div class="p-4 bg-gray-50 border-b border-gray-200 flex items-center justify-between">
+            <div class="flex items-center space-x-2 space-x-reverse">
+                <span class="w-2.5 h-2.5 rounded-full bg-blue-600 animate-pulse"></span>
+                <h3 class="text-sm font-bold text-gray-800">نقشه محله‌محور کالاها و ابزارهای امانتی</h3>
+                <span class="text-xs text-gray-500 hidden sm:inline">(محدوده ۵۰۰ متری تقریبی جهت حفظ حریم خصوصی همسایگان)</span>
+            </div>
+            <button type="button" id="toggle-catalog-map" class="text-xs text-blue-600 hover:text-blue-800 font-medium">
+                بستن نقشه
+            </button>
+        </div>
+        <div id="catalog-map-wrapper" class="relative w-full" style="height: 320px; z-index: 10;">
+            <div id="catalog-overview-map" class="w-full h-full" style="z-index: 1;"></div>
+        </div>
+    </div>
+
     <!-- Items Grid -->
     {% if items %}
         <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
@@ -138,4 +162,109 @@
         </div>
     {% endif %}
 </div>
+{% endblock %}
+
+{% block extra_js %}
+<script id="items-geo-data" type="application/json">
+[
+    {% for item in items %}
+        {% if item.latitude and item.longitude %}
+        {
+            "id": {{ item.id }},
+            "title": "{{ item.title|escapejs }}",
+            "city": "{{ item.city|escapejs }}",
+            "neighborhood": "{{ item.neighborhood|default:''|escapejs }}",
+            "price": "{{ item.daily_price|default:0 }}",
+            "lat": {{ item.latitude }},
+            "lng": {{ item.longitude }},
+            "url": "{% url 'catalog:item_detail' item.id %}"
+        }{% if not forloop.last %},{% endif %}
+        {% endif %}
+    {% endfor %}
+]
+</script>
+<script>
+    document.addEventListener("DOMContentLoaded", function () {
+        const mapContainer = document.getElementById("catalog-overview-map");
+        const mapWrapper = document.getElementById("catalog-map-wrapper");
+        const toggleBtn = document.getElementById("toggle-catalog-map");
+        const dataElement = document.getElementById("items-geo-data");
+
+        if (!mapContainer || !dataElement || typeof L === "undefined") return;
+
+        if (L.Icon && L.Icon.Default) {
+            L.Icon.Default.imagePath = "{% static 'vendor/leaflet/images/' %}";
+        }
+
+        let itemsData = [];
+        try {
+            itemsData = JSON.parse(dataElement.textContent.trim());
+        } catch (e) {
+            console.error("Error parsing items geo data", e);
+        }
+
+        const map = L.map("catalog-overview-map", {
+            attributionControl: false
+        }).setView([35.6892, 51.3890], 11);
+
+        L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+            maxZoom: 19
+        }).addTo(map);
+
+        const markersGroup = L.featureGroup();
+
+        itemsData.forEach(function (it) {
+            if (it.lat && it.lng) {
+                // 500m privacy circle
+                const circle = L.circle([it.lat, it.lng], {
+                    color: "#2563eb",
+                    fillColor: "#3b82f6",
+                    fillOpacity: 0.15,
+                    radius: 500
+                }).addTo(markersGroup);
+
+                // Marker
+                const marker = L.marker([it.lat, it.lng]).addTo(markersGroup);
+
+                const popupContent = `
+                    <div class="text-right p-1 font-sans leading-relaxed" style="min-width: 170px;">
+                        <h4 class="font-bold text-xs text-gray-900 mb-1">${it.title}</h4>
+                        <p class="text-[11px] text-gray-500 mb-1">${it.city}${it.neighborhood ? ' - ' + it.neighborhood : ''}</p>
+                        <p class="text-xs font-semibold text-blue-600 mb-2">روزانه ${Number(it.price).toLocaleString('fa-IR')} تومان</p>
+                        <a href="${it.url}" class="block text-center bg-blue-600 text-white text-[11px] font-medium py-1 px-2 rounded-lg hover:bg-blue-700">مشاهده کالا</a>
+                    </div>
+                `;
+                marker.bindPopup(popupContent);
+                circle.bindPopup(popupContent);
+            }
+        });
+
+        if (markersGroup.getLayers().length > 0) {
+            markersGroup.addTo(map);
+            map.fitBounds(markersGroup.getBounds().pad(0.15));
+        }
+
+        if (toggleBtn && mapWrapper) {
+            toggleBtn.addEventListener("click", function () {
+                if (mapWrapper.style.display === "none") {
+                    mapWrapper.style.display = "block";
+                    toggleBtn.textContent = "بستن نقشه";
+                    setTimeout(function () {
+                        map.invalidateSize();
+                        if (markersGroup.getLayers().length > 0) {
+                            map.fitBounds(markersGroup.getBounds().pad(0.15));
+                        }
+                    }, 150);
+                } else {
+                    mapWrapper.style.display = "none";
+                    toggleBtn.textContent = "نمایش نقشه";
+                }
+            });
+        }
+
+        setTimeout(function () {
+            map.invalidateSize();
+        }, 300);
+    });
+</script>
 {% endblock %}
